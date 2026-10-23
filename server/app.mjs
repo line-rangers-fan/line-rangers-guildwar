@@ -154,6 +154,10 @@ export function createApp({
       warning: r.warning,
     });
   });
+  app.post("/api/guilds/:gid/sync", params, authorizeWrite, async (req, res) => {
+    const r = await sources.syncMembers(req.params.gid);
+    res.json({ members: r.data, mode: r.mode, source: r.source, fetchedAt: r.fetchedAt, updatedAt: r.updatedAt, stale: r.stale, warning: r.warning, needsSetup: r.needsSetup });
+  });
   app.get("/api/guilds/:gid/checks", params, (req, res) => {
     const team = req.query.team || "ally";
     if (!["ally", "enemy"].includes(team))

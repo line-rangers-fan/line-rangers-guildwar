@@ -1,4 +1,5 @@
 import { validId } from "./domain.mjs";
+import { RANGERBOOK_BASE, RANKING_URL, publicRankings, selectRoster, reconcileRoster, assertRecent } from "./rangerbook.mjs";
 export function normalizeGuilds(input) {
   if (!Array.isArray(input) || !input.length || input.length > 20000)
     throw new Error("ギルド一覧の形式が変わっています");
@@ -48,7 +49,7 @@ export function normalizeMembers(input) {
 }
 export function createSources(store, config = {}, requestJSON) {
   const pending = new Map();
-  async function cached(key, ttl, urls, normalize) {
+  async function cached(key, ttl, urls, normalize, options) {
     const prev = await store.getCache(key);
     if (prev && Date.now() - Date.parse(prev.fetchedAt) < ttl)
       return { ...prev, stale: false };
@@ -60,7 +61,7 @@ export function createSources(store, config = {}, requestJSON) {
           return {
             ...(await store.putCache(
               key,
-              normalize(await requestJSON(url)),
+              normalize(await requestJSON(url, options)),
               url,
             )),
             stale: false,
@@ -84,7 +85,43 @@ export function createSources(store, config = {}, requestJSON) {
       pending.delete(key);
     }
   }
+  async function syncMembers(gid) {
+    const key = `roster-sync:${gid}`;
+    if (pending.has(key)) return pending.get(key);
+    const task = (async () => {
+      const previous = await store.getRoster(gid);
+      try {
+        const ranking = await cached("rangerbook-ranking", 15 * 60000, [RANKING_URL], publicRankings);
+        if (ranking.stale) throw new Error("Rangerbookのランキングを更新できません。");
+        const guild = ranking.data.guilds.find((g) => g.gid === gid);
+        if (!guild || !["LEGEND", "MASTER", "DIAMOND"].includes(guild.tier))
+          throw new Error("このギルドはRangerbookの公開対象に含まれていません。");
+        const url = `${RANGERBOOK_BASE}/guildwar_data_${guild.tier}.json`;
+        const snapshot = await cached(`rangerbook-snapshot:${guild.tier}`, 30 * 60000, [url], (value) => {
+          assertRecent(value.metadata);
+          return value;
+        }, { compactGuilds: true });
+        if (snapshot.stale) throw new Error("Rangerbookの公開名簿を更新できません。");
+        const { members, observedAt } = selectRoster(ranking.data, snapshot.data, gid);
+        const { data, duplicates } = reconcileRoster(previous?.data || [], members);
+        // Re-read after the network operation: do not race a manual edit.
+        const current = await store.getRoster(gid);
+        if (current?.updatedAt !== previous?.updatedAt || current?.mode !== previous?.mode || JSON.stringify(current?.data) !== JSON.stringify(previous?.data))
+          throw new Error("名簿が編集されたため、公開名簿の反映を中止しました。");
+        const saved = previous?.mode === "rangerbook" && previous.fetchedAt === observedAt && JSON.stringify(previous.data) === JSON.stringify(data)
+          ? previous : await store.putRoster(gid, data, "rangerbook", observedAt);
+        return { ...saved, source: url, stale: false, warning: duplicates ? "同名メンバーは保存済みの登録を維持しています。個別の変更は「名簿を管理」で確認してください。" : undefined };
+      } catch (e) {
+        const previous = await store.getRoster(gid);
+        if (previous) return { ...previous, stale: true, warning: e.message };
+        return { data: [], mode: "unregistered", source: RANKING_URL, fetchedAt: null, updatedAt: null, stale: true, needsSetup: true, warning: e.message };
+      }
+    })();
+    pending.set(key, task);
+    try { return await task; } finally { pending.delete(key); }
+  }
   return {
+    syncMembers,
     guilds: async () => {
       let result;
       try {
@@ -120,7 +157,9 @@ export function createSources(store, config = {}, requestJSON) {
     members: async (gid) => {
       const local = await store.getRoster(gid);
       // Closed-site caches are promoted locally; their remote URLs are never requested.
-      if (local && (local.mode === "manual" || !config.memberURL)) return local;
+      if (local?.mode === "manual") return local;
+      if (local?.mode === "rangerbook" && !config.memberURL) return syncMembers(gid);
+      if (local && !config.memberURL) return local;
       const legacy = await store.getCache(`members:${gid}`);
       if (!local && legacy) {
         const saved = await store.putRoster(
@@ -131,6 +170,7 @@ export function createSources(store, config = {}, requestJSON) {
         );
         if (!config.memberURL) return saved;
       }
+      if (!config.memberURL) return syncMembers(gid);
       if (config.memberURL) {
         try {
           const r = await cached(

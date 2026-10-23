@@ -153,7 +153,7 @@ test("brand-new installation works fully offline; names can change without losin
     rmSync(dir, { recursive: true, force: true });
   }
 });
-test("unregistered guild is explicitly empty, without any member network request", async () => {
+test("unregistered guild stays explicitly empty if public ranking is unavailable", async () => {
   const store = openStore(":memory:");
   try {
     let calls = 0;
@@ -162,7 +162,7 @@ test("unregistered guild is explicitly empty, without any member network request
       throw new Error();
     });
     const r = await sources.members("new-guild");
-    assert.equal(calls, 0);
+    assert.equal(calls, 1);
     assert.equal(r.needsSetup, true);
     assert.deepEqual(r.data, []);
   } finally {

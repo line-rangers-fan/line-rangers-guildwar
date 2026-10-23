@@ -17,6 +17,7 @@
     "db:generate": "drizzle-kit generate --dialect sqlite --schema db/schema.ts --out drizzle"
   },
   "dependencies": {
+    "@streamparser/json": "0.0.22",
     "express": "^5.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
