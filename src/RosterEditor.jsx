@@ -231,7 +231,7 @@ export function RosterEditor({ gid, members, token, onSaved, onClose }) {
         </p>
       )}
       <p className="subtle">
-        自動でゲーム情報を取得する機能ではありません。名簿JSONは他の端末への持ち運びに使えます。攻撃記録を含む全データのバックアップ方法はREADMEに記載しています。
+        保存すると手動管理に切り替わります。「公開名簿を取得」で公開データによる更新に戻せます。改名は既存の行を編集すると攻撃記録を引き継げます。名簿JSONは他の端末への持ち運びに使えます。
       </p>
     </section>
   );

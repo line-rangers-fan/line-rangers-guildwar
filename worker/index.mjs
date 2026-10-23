@@ -1,5 +1,6 @@
 import { createD1Store } from "./store.mjs";
 import { createSources, normalizeMembers } from "../shared/sources.mjs";
+import { readCompactSnapshot } from "../shared/rangerbook.mjs";
 import { gameDate, validId, weekDates } from "../shared/domain.mjs";
 import { assets } from "./assets.generated.mjs";
 const security = {
@@ -18,13 +19,13 @@ const json = (value, status = 200) =>
     },
   });
 const sessions = new WeakMap();
-async function remoteJSON(url) {
+async function remoteJSON(url, options = {}) {
   const r = await fetch(url, {
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(options.compactGuilds ? 90000 : 15000),
     headers: { accept: "application/json" },
   });
   if (!r.ok) throw new Error("upstream unavailable");
-  return r.json();
+  return options.compactGuilds ? readCompactSnapshot(r) : r.json();
 }
 export function createWorkerHandler(makeStore = createD1Store) {
   return {
@@ -129,14 +130,14 @@ export function createWorkerHandler(makeStore = createD1Store) {
           return json({ guild: g }, 201);
         }
         const match = path.match(
-          /^\/api\/guilds\/([^/]+)\/(members|roster|checks)$/,
+          /^\/api\/guilds\/([^/]+)\/(members|roster|checks|sync)$/,
         );
         if (!match) return json({ error: "APIが見つかりません" }, 404);
         const [, gid, action] = match;
         if (!validId(gid))
           return json({ error: "ギルドIDが正しくありません" }, 400);
-        if (action === "members" && request.method === "GET") {
-          const r = await sources.members(gid);
+        if ((action === "members" && request.method === "GET") || (action === "sync" && request.method === "POST")) {
+          const r = action === "sync" ? await sources.syncMembers(gid) : await sources.members(gid);
           return json({
             members: r.data,
             source: r.source,

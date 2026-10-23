@@ -34,3 +34,15 @@ GitHubの公開リポジトリ・コード検索とLericoの配信コードか�
 ## 提供機能の範囲
 
 参考サイトの攻撃チェッカーに相当する機能と、Lericoのギルドランキングの主要表示を新規実装。PVP分析は同じ組織の既存 `line-rangers-pvp` へ、レンジャー図鑑はLericoへリンクする。ゲームへのログイン、内部APIの解析・認証回避、元サイトの管理機能・広告の複製は実装していない。
+
+
+## Rangerbookの公開名簿を接続（2026-10-23）
+
+- 画面: https://rangerbook.warmycat.com
+- 公開実装: https://github.com/mti0224/rangerbook/blob/main/assets/js/guildwar-ranking.js
+- ランキング: https://pvp-data.warmycat.com/guildwar_ranking.json
+- 名簿: https://pvp-data.warmycat.com/guildwar_data_LEGEND.json （MASTER / DIAMONDも同形式）
+
+閉鎖予定APIを別途取得してドリチーの50人を比較し、名前の重複人数を含む全員の名前・レベルが一致した。これは取得結果の一致であり、Rangerbookが元APIに依存しない証明ではない。公開資料にはguild collectorの説明があるが、収集プログラム本体とゲームのエンドポイントは非公開。
+
+名簿にはギルドID・プレイヤーIDがない。ランキングのギルドIDと一意のギルド名で名簿を照合し、順位で対応付けない。6時間以上古いデータ、人数不一致、同名者の対応が不明な場合は保存名簿を維持する。公開スナップショットはストリーム処理し、名前とレベルだけ抽出する。攻撃回数は従来どおり利用者の手動記録。

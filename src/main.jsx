@@ -607,7 +607,7 @@ function App() {
             >
               ＋ ギルドを登録
             </button>
-            <span>外部サービスに依存しない名簿・攻撃記録</span>
+            <span>公開名簿の取得と、攻撃記録の共有</span>
           </div>
           {registerGuild && (
             <GuildRegistration
@@ -625,7 +625,7 @@ function App() {
             <section className="help-panel">
               <h2>使い方と保存設定</h2>
               <p>
-                メンバー名簿はこのサイト自身のDBで管理します。取得済み名簿は引き継ぎ、入退会・改名は「名簿を管理」で更新します。攻撃結果は自動判定しません。ゲーム内の結果を確認してチェックしてください。2回目をチェックすると1回目もチェックされ、1回目を外すと2回目も外れます。
+                対応ギルドはRangerbookの公開名簿から取得できます。名簿と攻撃記録はこのサイトのDBに保存します。攻撃結果はゲーム内で確認してチェックしてください。2回目をチェックすると1回目もチェックされ、1回目を外すと2回目も外れます。
               </p>
               <p>
                 味方と敵で別々のギルドを選べます。チェックはこのサイトのサーバーに保存し、他の端末には約15秒で反映します。週は月曜〜日曜、日付は日本時間09:00に切り替わります。
@@ -736,11 +736,37 @@ function App() {
                         : roster?.mode === "manual"
                           ? "このサイトで管理している名簿です。ゲーム内での変更は「名簿を管理」から反映してください。"
                           : roster?.needsSetup
-                            ? "このギルドの名簿は未登録です。「名簿を管理」からメンバーを登録してください。"
+                            ? "公開名簿を取得できませんでした。「名簿を管理」から登録して利用できます。"
+                            : roster?.mode === "rangerbook"
+                              ? `Rangerbookの公開名簿（データ更新：${dateText(roster.fetchedAt)} JST）。表示名で照合します。改名・同名者は「名簿を管理」で確認してください。`
                             : roster?.mode === "provider"
                               ? "設定した独立した取得元から更新しています。"
                               : ""}
                     </p>
+                    {roster?.warning && !roster?.stale && <p role="status">{roster.warning}</p>}
+                    <button
+                      className="button secondary"
+                      disabled={rosterLoading || saving || editingRoster}
+                      onClick={async () => {
+                        const seq = generation.current;
+                        setRosterLoading(true);
+                        try {
+                          const result = await api(`/api/guilds/${gid}/sync`, {
+                            method: "POST",
+                            headers: token ? { authorization: `Bearer ${token}` } : {},
+                          });
+                          if (seq !== generation.current) return;
+                          setRoster(result);
+                          announce(result.stale ? "取得できないため、保存名簿を維持しました" : "公開名簿を反映しました");
+                        } catch (e) {
+                          if (seq === generation.current) setError(e.message);
+                        } finally {
+                          if (seq === generation.current) setRosterLoading(false);
+                        }
+                      }}
+                    >
+                      {rosterLoading ? "取得中…" : "公開名簿を取得"}
+                    </button>
                     <button
                       className="button secondary"
                       disabled={rosterLoading || saving}
@@ -1244,7 +1270,7 @@ function App() {
               >
                 LINE Rangers Handbook（Lerico）
               </a>
-              。メンバー名簿と攻撃記録はこのサイト自身のDBで管理します。閉鎖予定の元サイトへの通信は行いません。Lericoは第三者サービスで、LINE公式APIではありません。
+              。メンバー名簿は <a href="https://rangerbook.warmycat.com" target="_blank" rel="noreferrer">Rangerbook</a> の公開配信から取得し、このサイトのDBに保存します。閉鎖予定の元サイトへの通信は行いません。いずれも第三者サービスで、LINE公式APIではありません。Rangerbook側の収集元は未確認です。
             </p>
             <p>
               一覧取得：{dateText(guildResponse?.fetchedAt)} JST
@@ -1257,7 +1283,7 @@ function App() {
                   JST
                 </>
               )}
-              。一覧は15分キャッシュします。メンバー名簿は手動更新が基本です。管理者が独立した取得元を設定した場合のみ自動取得します。
+              。一覧は15分、公開名簿は30分キャッシュします。公開名簿の利用開始後は画面の再読込時に更新します。手動編集後は手動名簿を優先し、「公開名簿を取得」で自動更新に戻せます。PVPランクは配信されないため更新しません。
             </p>
             <p>
               ゲーム情報が最新とは限りません。ギルド一覧の取得が停止しても、保存済み・手動登録のギルドと名簿で攻撃チェックを継続できます。
