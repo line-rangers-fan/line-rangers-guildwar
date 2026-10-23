@@ -1,0 +1,26 @@
+{
+  "name": "line-rangers-guildwar",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "LINE Rangers guild rankings and shared guild-war attack checklist",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node server/index.mjs",
+    "dev": "node scripts/dev.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check:live": "node scripts/check-live.mjs"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "undici": "^7.16.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.11"
+  }
+}

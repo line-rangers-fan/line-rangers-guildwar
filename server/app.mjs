@@ -1,0 +1,138 @@
+import express from "express";
+import { resolve } from "node:path";
+import { gameDate, validId, weekDates } from "../shared/domain.mjs";
+export function createApp({
+  store,
+  sources,
+  writeToken = "",
+  staticDir = resolve("dist"),
+}) {
+  const app = express();
+  app.disable("x-powered-by");
+  app.use((req, res, next) => {
+    res.set({
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "strict-origin-when-cross-origin",
+      "Content-Security-Policy":
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
+    });
+    next();
+  });
+  app.use(express.json({ limit: "16kb" }));
+  app.use("/api", (req, res, next) => {
+    res.set("Cache-Control", "no-store");
+    next();
+  });
+  app.get("/api/health", (req, res) =>
+    res.json({
+      ok: true,
+      storage: "sqlite",
+      gameDate: gameDate(),
+      writeProtected: Boolean(writeToken),
+    }),
+  );
+  const params = (req, res, next) => {
+    if (!validId(req.params.gid)) {
+      res.status(400).json({ error: "ギルドIDが正しくありません" });
+      return;
+    }
+    next();
+  };
+  app.get("/api/guilds", async (req, res) => {
+    const r = await sources.guilds();
+    res.json({
+      guilds: r.data,
+      source: r.source,
+      fetchedAt: r.fetchedAt,
+      stale: r.stale,
+      warning: r.warning,
+    });
+  });
+  app.get("/api/guilds/:gid/members", params, async (req, res) => {
+    const r = await sources.members(req.params.gid);
+    res.json({
+      members: r.data,
+      source: r.source,
+      fetchedAt: r.fetchedAt,
+      stale: r.stale,
+      warning: r.warning,
+    });
+  });
+  app.get("/api/guilds/:gid/checks", params, (req, res) => {
+    const team = req.query.team || "ally";
+    if (!["ally", "enemy"].includes(team))
+      return res.status(400).json({ error: "チームが正しくありません" });
+    let dates;
+    try {
+      dates = weekDates(req.query.week || gameDate());
+    } catch (e) {
+      return res.status(400).json({ error: e.message });
+    }
+    res.json({
+      states: store.getChecks(req.params.gid, team, dates[0], dates[2]),
+      dates,
+    });
+  });
+  app.put("/api/guilds/:gid/checks", params, async (req, res) => {
+    const origin = req.get("origin");
+    if (origin) {
+      try {
+        if (new URL(origin).host !== req.get("host"))
+          return res
+            .status(403)
+            .json({ error: "別サイトからの保存はできません" });
+      } catch {
+        return res.status(403).json({ error: "送信元が正しくありません" });
+      }
+    }
+    if (writeToken && req.get("authorization") !== `Bearer ${writeToken}`)
+      return res
+        .status(401)
+        .json({ error: "設定から保存用キーを入力してください" });
+    const { team, uid, day, slot, checked } = req.body || {};
+    if (
+      !["ally", "enemy"].includes(team) ||
+      !validId(uid) ||
+      ![1, 2].includes(slot) ||
+      typeof checked !== "boolean"
+    )
+      return res.status(400).json({ error: "チェック内容が正しくありません" });
+    let dates;
+    try {
+      dates = weekDates(day);
+      if (!dates.includes(day)) throw new Error();
+    } catch {
+      return res
+        .status(400)
+        .json({ error: "水・金・日の正しい日付を指定してください" });
+    }
+    const r = await sources.members(req.params.gid);
+    if (!r.data.some((m) => m.uid === uid))
+      return res
+        .status(400)
+        .json({ error: "このギルドに登録されていないメンバーです" });
+    store.saveCheck({ gid: req.params.gid, team, uid, day, slot, checked });
+    res.json({
+      states: store.getChecks(req.params.gid, team, dates[0], dates[2]),
+    });
+  });
+  app.use("/api", (req, res) =>
+    res.status(404).json({ error: "APIが見つかりません" }),
+  );
+  app.use(express.static(staticDir, { index: false }));
+  app.get(["/", "/guildWarCount", "/guild-tracker"], (req, res) =>
+    res.sendFile(resolve(staticDir, "index.html")),
+  );
+  app.use((err, req, res, next) => {
+    const code = err.status === 400 ? 400 : 502;
+    res
+      .status(code)
+      .json({
+        error:
+          code === 400
+            ? "リクエストの形式が正しくありません"
+            : "情報を取得できませんでした。しばらくしてから再試行してください。",
+      });
+  });
+  return app;
+}
