@@ -285,3 +285,32 @@
  .compact-checker .table-footer { padding: 2px 4px; }
  .compact-checker .usage-note { margin: 2px 0; }
 }
+
+
+/* Dense roster mode: remove nonessential chrome, retain accessible attack targets. */
+@media (max-width: 600px) {
+ .compact-checker .sidebar, .compact-checker .topbar,
+ .compact-checker .page-heading, .compact-checker .registration-toolbar,
+ .compact-checker .guild-selection, .compact-checker .roster-details,
+ .compact-checker .guild-identity p, .compact-checker .attack-legend,
+ .compact-checker .usage-note { display: none; }
+ .compact-checker main { padding: 0 3px; }
+ .compact-checker .team-toolbar { margin: 0 0 2px; }
+ .compact-checker .segmented { width: 100%; justify-content: center; }
+ .compact-checker .segmented button { flex: 1; }
+ .compact-checker .guild-heading { margin: 1px 0; }
+ .compact-checker .guild-heading > .button { min-height: 22px; }
+ .compact-checker .stats { margin-bottom: 1px; }
+ .compact-checker .stat { padding: 1px 0; }
+ .compact-checker .stat-value { font-size: 15px; }
+ .compact-checker .roster-top { padding: 1px 3px; }
+ .compact-checker .table-tools { padding: 1px 3px; }
+ .compact-checker .member-tools { gap: 2px; }
+ .compact-checker .tabs button { padding: 2px 3px; }
+ .compact-checker .compact-member-table tbody .member-name small { display: none; }
+ .compact-checker .compact-member-table tbody .member-name { font-size: 10px; padding: 1px 2px; }
+ .compact-checker .compact-member-table .check-cell { height: 30px; }
+ .compact-checker .attack-mark { height: 28px; min-height: 28px; }
+ .compact-checker .compact-member-table thead th { padding: 2px 0; }
+ .compact-checker .table-footer { padding: 1px 3px; }
+}
