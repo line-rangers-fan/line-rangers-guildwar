@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir, copyFile, cp } from "node:fs/promises";
 import { build } from "esbuild";
 const table = {};
 for (const [path, type] of [
@@ -23,4 +23,5 @@ await build({
   minify: true,
 });
 await copyFile(".openai/hosting.json", "worker-dist/.openai/hosting.json");
+await cp("migrations","worker-dist/migrations",{recursive:true});
 console.log("Built worker-dist/");
