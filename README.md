@@ -101,15 +101,16 @@ npm run check:live
 
 自動テストはJST09:00と週境界、年越し、ギルド・チーム・週の分離、保存後のDB再オープン、再送の冪等性、2回目と1回目の整合性、認証・送信元・入力検証、CSV数式対策を確認します。さらに全外部サービス停止状態での新規登録・名簿更新・攻撃記録保持・キャッシュ移行・SQLiteバックアップを検証します。
 
-## GitHubへの配置
+## リポジトリ
 
-対象は `line-rangers-fan/line-rangers-guildwar` です。現在のGitHub接続では、新規リポジトリ作成がGraphQL・REST両方で `Resource not accessible by integration`（403）となりました。そのためローカルGitリポジトリとして作成しています。
-
-GitHub上に空の同名リポジトリを作成して接続対象に含めた後、次を実行します。
+https://github.com/line-rangers-fan/line-rangers-guildwar
 
 ```sh
-git remote add origin https://github.com/line-rangers-fan/line-rangers-guildwar.git
-git push -u origin main
+git clone https://github.com/line-rangers-fan/line-rangers-guildwar.git
+cd line-rangers-guildwar
+npm ci
+npm run build
+npm start
 ```
 
-共有データ、キャッシュ、環境変数、node_modules、生成物はGitの管理対象外です。
+共有データ、キャッシュ、環境変数、node_modules、生成物はGitの管理対象外です。名簿や攻撃記録の移行には別途DBバックアップを使用してください。GitHubへのコード配置と、Renderなどへの本番公開は別の作業です。
