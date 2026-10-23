@@ -198,3 +198,42 @@
   .compact-member-table .left-column { width: 24px; }
   .compact-checker .stat-header { font-size: 8px; }
 }
+
+
+/* Mobile-first attack dashboard: reserve the first viewport for the checklist.
+   Visual-only overrides; do not alter check state, storage or API behavior. */
+@media (max-width: 600px) {
+  .compact-checker .sidebar { padding-block: 3px; }
+  .compact-checker .topbar { height: 24px; }
+  .compact-checker main { padding: 4px 6px 0; }
+  .compact-checker .page-heading { margin-bottom: 2px; }
+  .compact-checker h1 { font-size: 15px; line-height: 1.15; }
+  .compact-checker .registration-toolbar { margin-bottom: 2px; }
+  .compact-checker .team-toolbar { margin-bottom: 2px; }
+  .compact-checker .segmented button { min-height: 27px; }
+  .compact-checker .guild-heading { margin: 3px 0; }
+  .compact-checker .guild-identity h2 { font-size: 13px; line-height: 1.2; }
+  .compact-checker .stats { margin-bottom: 4px; }
+  .compact-checker .stat { padding: 4px 1px; }
+  .compact-checker .stat-value { font-size: 19px; margin-top: 2px; }
+  .compact-checker .roster-top { padding: 3px 5px; }
+  .compact-checker .table-tools { padding: 3px 5px; }
+  .compact-checker .tabs button { min-height: 26px; padding: 3px 5px; }
+  .compact-checker .member-tools input { min-height: 28px; }
+  .compact-checker .member-sort { min-height: 28px; }
+  .compact-checker .attack-legend { padding: 1px 5px 3px; }
+  .compact-checker .compact-member-table thead th { padding: 3px 1px; }
+  .compact-checker .compact-member-table tbody .member-name {
+    padding: 2px 3px 2px 5px; font-size: 11px; line-height: 1.15;
+  }
+  .compact-checker .compact-member-table .check-cell { height: 32px; padding: 1px; }
+  .compact-checker .attack-mark { width: min(44px, 100%); height: 30px; min-height: 30px; }
+  .compact-checker .compact-member-table .remaining-col { padding: 1px; }
+  .compact-checker .table-footer { padding: 4px 6px; }
+  .compact-checker .usage-note { margin: 4px 0; }
+}
+@media (max-width: 380px) {
+  .compact-checker .compact-member-table .attack-column { width: 46px; }
+  .compact-checker .compact-member-table .left-column { width: 24px; }
+  .compact-checker .attack-mark { width: min(40px, 100%); }
+}
