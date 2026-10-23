@@ -237,3 +237,51 @@
   .compact-checker .compact-member-table .left-column { width: 24px; }
   .compact-checker .attack-mark { width: min(40px, 100%); }
 }
+
+
+/* Ultra-compact phone checklist: keep three attack days and names visible. */
+@media (max-width: 600px) {
+ .compact-checker .sidebar { padding: 2px 6px; min-height: 26px; }
+ .compact-checker .brand-mark { width: 22px; height: 22px; }
+ .compact-checker .brand > span:not(.brand-mark) { font-size: 8px; }
+ .compact-checker .brand small { display: none; }
+ .compact-checker .nav { min-height: 24px; width: 26px; padding: 3px; }
+ .compact-checker .topbar { height: 20px; padding: 0 6px; }
+ .compact-checker main { padding: 2px 4px 0; }
+ .compact-checker .page-heading { margin-bottom: 1px; }
+ .compact-checker h1 { font-size: 13px; margin: 0; }
+ .compact-checker .page-heading .button { min-height: 24px; padding: 2px 5px; }
+ .compact-checker .registration-toolbar { margin: 0; }
+ .compact-checker .registration-toolbar button { font-size: 9px; padding: 1px 0; }
+ .compact-checker .team-toolbar { margin: 1px 0; }
+ .compact-checker .segmented { padding: 1px; }
+ .compact-checker .segmented button { min-height: 24px; padding: 3px 7px; font-size: 10px; }
+ .compact-checker .guild-heading { margin: 2px 0; }
+ .compact-checker .guild-identity h2 { font-size: 12px; margin: 0; }
+ .compact-checker .guild-identity p { display: none; }
+ .compact-checker .guild-heading > .button { min-height: 24px; padding: 2px 4px; }
+ .compact-checker .guild-selection > summary,
+ .compact-checker .roster-details > summary { min-height: 23px; padding: 3px 6px; }
+ .compact-checker .roster-details { margin-bottom: 2px; }
+ .compact-checker .stats { margin-bottom: 2px; border-radius: 4px; }
+ .compact-checker .stat { padding: 2px 0; }
+ .compact-checker .stat-header { font-size: 8px; }
+ .compact-checker .stat-value { font-size: 17px; margin: 1px 0 0; }
+ .compact-checker .roster-top { padding: 2px 4px; gap: 2px; }
+ .compact-checker .week-switch { gap: 3px; }
+ .compact-checker .week-switch > button { height: 23px; }
+ .compact-checker .table-tools { padding: 2px 4px; gap: 2px; }
+ .compact-checker .tabs button { min-height: 24px; padding: 2px 4px; font-size: 9px; }
+ .compact-checker .member-tools input,
+ .compact-checker .member-sort { min-height: 25px; height: 25px; }
+ .compact-checker .attack-legend { padding: 1px 4px 2px; font-size: 8px; }
+ .compact-checker .compact-member-table thead th { padding: 2px 1px; font-size: 9px; }
+ .compact-checker .compact-member-table .day-heading small { font-size: 8px; }
+ .compact-checker .compact-member-table tbody .member-name { padding: 1px 2px 1px 4px; font-size: 10px; line-height: 1.1; }
+ .compact-checker .compact-member-table .check-cell { height: 29px; padding: 1px; }
+ .compact-checker .attack-mark { height: 27px; min-height: 27px; border-radius: 3px; }
+ .compact-checker .attack-strokes { transform: scale(.85); }
+ .compact-checker .compact-member-table .count-badge { padding: 2px; font-size: 9px; }
+ .compact-checker .table-footer { padding: 2px 4px; }
+ .compact-checker .usage-note { margin: 2px 0; }
+}
