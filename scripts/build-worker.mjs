@@ -23,5 +23,5 @@ await build({
   minify: true,
 });
 await copyFile(".openai/hosting.json", "worker-dist/.openai/hosting.json");
-await cp("migrations","worker-dist/migrations",{recursive:true});
+await cp("drizzle","worker-dist/drizzle",{recursive:true});
 console.log("Built worker-dist/");
