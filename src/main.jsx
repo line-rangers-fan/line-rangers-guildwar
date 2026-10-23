@@ -12,6 +12,7 @@ import {
   csvCell,
 } from "../shared/domain.mjs";
 import "./style.css";
+import { RosterEditor, GuildRegistration } from "./RosterEditor.jsx";
 
 function Icon({ name, size = 20, ...props }) {
   const paths = {
@@ -129,6 +130,8 @@ function App() {
     [sort, setSort] = useState({ key: "pvp", dir: 1 }),
     [page, setPage] = useState(1),
     [rankSort, setRankSort] = useState({ key: "lastGuildWarRank", dir: 1 });
+  const [editingRoster, setEditingRoster] = useState(false),
+    [registerGuild, setRegisterGuild] = useState(false);
   const [settings, setSettings] = useState(false),
     [token, setToken] = useState(
       () => sessionStorage.getItem("guildwar-write-token") || "",
@@ -209,6 +212,7 @@ function App() {
     setError("");
     setSaved("");
     setRoster(null);
+    setEditingRoster(false);
     if (!gid) return () => c.abort();
     setRosterLoading(true);
     Promise.all([
@@ -310,7 +314,8 @@ function App() {
           (g) =>
             (!country || g.nationalFlag === country) &&
             (!search || g.name.toLowerCase().includes(search.toLowerCase())) &&
-            (rankLimit === "all" ||
+            (g.local ||
+              rankLimit === "all" ||
               (g.lastGuildWarRank > 0 &&
                 g.lastGuildWarRank <= Number(rankLimit))),
         )
@@ -549,6 +554,13 @@ function App() {
             </strong>
           </span>
           <div className="topbar-right">
+            <button
+              className="mobile-settings"
+              aria-label="使い方・保存設定"
+              onClick={() => setSettings((v) => !v)}
+            >
+              <Icon name="info" size={16} />
+            </button>
             <span className="jst">JST · 毎日 09:00 切り替え</span>
             <a
               href="https://github.com/line-rangers-fan"
@@ -587,11 +599,32 @@ function App() {
               更新
             </button>
           </div>
+          <div className="registration-toolbar">
+            <button
+              className="text-button"
+              onClick={() => setRegisterGuild((v) => !v)}
+            >
+              ＋ ギルドを登録
+            </button>
+            <span>外部サービスに依存しない名簿・攻撃記録</span>
+          </div>
+          {registerGuild && (
+            <GuildRegistration
+              token={token}
+              onClose={() => setRegisterGuild(false)}
+              onSaved={(g) => {
+                setRegisterGuild(false);
+                setSelection((s) => ({ ...s, [team]: g.gid }));
+                setView("checker");
+                setRefresh((n) => n + 1);
+              }}
+            />
+          )}
           {settings && (
             <section className="help-panel">
               <h2>使い方と保存設定</h2>
               <p>
-                メンバー情報は公開データから取得します。攻撃結果は自動判定しません。ゲーム内の結果を確認してチェックしてください。2回目をチェックすると1回目もチェックされ、1回目を外すと2回目も外れます。
+                メンバー名簿はこのサイト自身のDBで管理します。取得済み名簿は引き継ぎ、入退会・改名は「名簿を管理」で更新します。攻撃結果は自動判定しません。ゲーム内の結果を確認してチェックしてください。2回目をチェックすると1回目もチェックされ、1回目を外すと2回目も外れます。
               </p>
               <p>
                 味方と敵で別々のギルドを選べます。チェックはこのサイトのサーバーに保存し、他の端末には約15秒で反映します。週は月曜〜日曜、日付は日本時間09:00に切り替わります。
@@ -634,7 +667,9 @@ function App() {
           )}
           {(guildResponse?.stale || roster?.stale) && (
             <div className="alert warning">
-              情報源に接続できないため、前回取得できたデータを表示しています。取得日時を確認してください。
+              {guildResponse?.warning ||
+                roster?.warning ||
+                "情報源に接続できないため、保存済みデータを表示しています。取得日時を確認してください。"}
             </div>
           )}
           {view === "checker" ? (
@@ -693,6 +728,55 @@ function App() {
                       共有リンク
                     </button>
                   </div>
+                  <div className="roster-status">
+                    <p>
+                      {roster?.mode === "snapshot"
+                        ? `閉鎖前に取得した保存名簿です（取得：${dateText(roster.fetchedAt)} JST）。入退会・改名は手動で反映してください。`
+                        : roster?.mode === "manual"
+                          ? "このサイトで管理している名簿です。ゲーム内での変更は「名簿を管理」から反映してください。"
+                          : roster?.needsSetup
+                            ? "このギルドの名簿は未登録です。「名簿を管理」からメンバーを登録してください。"
+                            : roster?.mode === "provider"
+                              ? "設定した独立した取得元から更新しています。"
+                              : ""}
+                    </p>
+                    <button
+                      className="button secondary"
+                      disabled={rosterLoading || saving}
+                      onClick={() => setEditingRoster((v) => !v)}
+                    >
+                      名簿を管理
+                    </button>
+                  </div>
+                  {editingRoster && (
+                    <RosterEditor
+                      key={gid}
+                      gid={gid}
+                      members={members}
+                      token={token}
+                      onClose={() => setEditingRoster(false)}
+                      onSaved={(r) => {
+                        setRoster(r);
+                        setGuildResponse((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                guilds: prev.guilds.map((g) =>
+                                  g.gid === gid
+                                    ? {
+                                        ...g,
+                                        currentMemberCount: r.members.length,
+                                      }
+                                    : g,
+                                ),
+                              }
+                            : prev,
+                        );
+                        setEditingRoster(false);
+                        announce("名簿を保存しました");
+                      }}
+                    />
+                  )}
                   <div className="stats">
                     <Stat
                       icon="users"
@@ -1159,18 +1243,23 @@ function App() {
               >
                 LINE Rangers Handbook（Lerico）
               </a>
-              。メンバー：rangers-api-3mfw.onrender.com
-              の公開API。いずれも第三者サービスで、LINE公式APIではありません。
+              。メンバー名簿と攻撃記録はこのサイト自身のDBで管理します。閉鎖予定の元サイトへの通信は行いません。Lericoは第三者サービスで、LINE公式APIではありません。
             </p>
             <p>
               一覧取得：{dateText(guildResponse?.fetchedAt)} JST
               {roster && (
-                <> ／ メンバー取得：{dateText(roster.fetchedAt)} JST</>
+                <>
+                  {" "}
+                  ／ 名簿更新：{dateText(
+                    roster.updatedAt || roster.fetchedAt,
+                  )}{" "}
+                  JST
+                </>
               )}
-              。一覧は15分、メンバーは5分キャッシュします。更新ボタンはキャッシュ有効期間内では保存済みデータを再表示します。
+              。一覧は15分キャッシュします。メンバー名簿は手動更新が基本です。管理者が独立した取得元を設定した場合のみ自動取得します。
             </p>
             <p>
-              ゲーム情報が最新とは限りません。情報源の停止時は保存済みのデータを取得日時とともに表示します。
+              ゲーム情報が最新とは限りません。ギルド一覧の取得が停止しても、保存済み・手動登録のギルドと名簿で攻撃チェックを継続できます。
             </p>
           </details>
           <footer>

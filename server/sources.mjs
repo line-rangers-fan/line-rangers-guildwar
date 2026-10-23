@@ -104,25 +104,87 @@ export function createSources(store, config = {}, requestJSON) {
     }
   }
   return {
-    guilds: () =>
-      cached(
-        "guilds",
-        15 * 60000,
-        [
-          config.guildURL || "https://rangers.lerico.net/api/v2/guilds",
-          config.fallbackURL ||
-            "https://rangers-api-3mfw.onrender.com/api/guilds/get-guild-names",
-        ],
-        normalizeGuilds,
-      ),
-    members: (gid) =>
-      cached(
-        `members:${gid}`,
-        5 * 60000,
-        [
-          `${config.memberBase || "https://rangers-api-3mfw.onrender.com"}/api/guild-member-info/${encodeURIComponent(gid)}/members`,
-        ],
-        normalizeMembers,
-      ),
+    guilds: async () => {
+      let result;
+      try {
+        result = await cached(
+          "guilds",
+          15 * 60000,
+          [
+            config.guildURL || "https://rangers.lerico.net/api/v2/guilds",
+            ...(config.fallbackURL ? [config.fallbackURL] : []),
+          ],
+          normalizeGuilds,
+        );
+      } catch {
+        result = {
+          data: [],
+          source: "local:guilds",
+          fetchedAt: null,
+          stale: true,
+          warning:
+            "ギルド情報を取得できません。保存済み・手動登録のギルドで運用できます。",
+        };
+      }
+      const combined = new Map(
+        (store.listLocalGuilds?.() || []).map((g) => [
+          g.gid,
+          { ...g, local: true },
+        ]),
+      );
+      for (const g of result.data)
+        combined.set(g.gid, { ...combined.get(g.gid), ...g });
+      return { ...result, data: [...combined.values()] };
+    },
+    members: async (gid) => {
+      const local = store.getRoster(gid);
+      // Closed-site caches are promoted locally; their remote URLs are never requested.
+      if (local && (local.mode === "manual" || !config.memberURL)) return local;
+      const legacy = store.getCache(`members:${gid}`);
+      if (!local && legacy) {
+        const saved = store.putRoster(
+          gid,
+          normalizeMembers(legacy.data),
+          "snapshot",
+          legacy.fetchedAt,
+        );
+        if (!config.memberURL) return saved;
+      }
+      if (config.memberURL) {
+        try {
+          const r = await cached(
+            `independent-members:${gid}`,
+            5 * 60000,
+            [config.memberURL.replace("{gid}", encodeURIComponent(gid))],
+            normalizeMembers,
+          );
+          const saved = store.putRoster(gid, r.data, "provider", r.fetchedAt);
+          return {
+            ...saved,
+            source: r.source,
+            stale: r.stale,
+            warning: r.warning,
+          };
+        } catch {
+          const prev = store.getRoster(gid);
+          if (prev)
+            return {
+              ...prev,
+              stale: true,
+              warning:
+                "自動取得先に接続できないため、保存済み名簿を表示しています。",
+            };
+        }
+      }
+      return {
+        data: [],
+        mode: "unregistered",
+        source: "local:roster",
+        fetchedAt: null,
+        updatedAt: null,
+        stale: false,
+        needsSetup: true,
+      };
+    },
   };
 }

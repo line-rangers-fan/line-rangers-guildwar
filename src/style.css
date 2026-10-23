@@ -1531,3 +1531,201 @@ footer a {
     z-index: 3;
   }
 }
+.registration-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: -12px 0 17px;
+  font-size: 10px;
+  color: #8b9c7f;
+  gap: 12px;
+}
+.registration-toolbar button {
+  font-size: 11px;
+}
+.roster-status {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin: -5px 0 18px;
+  padding: 13px 16px;
+  background: #edf2e5;
+  border-radius: 7px;
+  font-size: 10px;
+  color: #718565;
+}
+.roster-status p {
+  flex: 1;
+  margin: 0;
+  line-height: 1.8;
+}
+.roster-editor {
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.editor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.editor-heading h2 {
+  font-size: 16px;
+  margin: 0;
+}
+.editor-heading small {
+  font-size: 11px;
+  color: #8a9b7c;
+  margin-left: 10px;
+  font-weight: 400;
+}
+.roster-editor p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #839477;
+}
+.editor-list {
+  max-height: 390px;
+  overflow: auto;
+}
+.editor-row {
+  display: grid;
+  grid-template-columns: 20px minmax(120px, 1fr) 85px minmax(95px, 150px) 35px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #edf1e8;
+}
+.editor-row label,
+.editor-paste label,
+.registration-fields label {
+  font-size: 10px;
+  color: #829475;
+  display: grid;
+  gap: 5px;
+}
+.editor-row > span {
+  font-size: 10px;
+  color: #9ca88e;
+}
+.editor-row input,
+.editor-row select {
+  font-size: 11px;
+  padding: 8px;
+}
+.editor-paste {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 16px 0;
+}
+.editor-paste label {
+  flex: 1;
+}
+.editor-paste textarea {
+  width: 100%;
+  min-height: 70px;
+  resize: vertical;
+  border: 1px solid #dce4d5;
+  border-radius: 5px;
+  padding: 10px;
+  font: inherit;
+  font-size: 12px;
+}
+.editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.button.primary {
+  background: #356f48;
+  color: white;
+  border-color: #356f48;
+}
+.import-button {
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+}
+.import-button input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+.editor-error {
+  color: #ad654b !important;
+}
+.registration-fields {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+.registration-fields label:first-child {
+  flex: 1;
+}
+.registration-fields label:nth-child(2) {
+  width: 90px;
+}
+@media (max-width: 600px) {
+  .registration-toolbar span {
+    display: none;
+  }
+  .roster-status {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+  .roster-status p {
+    flex-basis: 100%;
+  }
+  .roster-editor {
+    padding: 14px;
+  }
+  .editor-row {
+    grid-template-columns: 16px 1fr 65px;
+    gap: 7px;
+  }
+  .editor-row label:nth-of-type(3) {
+    grid-column: 2;
+  }
+  .editor-row button {
+    grid-column: 3;
+  }
+  .registration-fields {
+    flex-wrap: wrap;
+  }
+  .registration-fields label:first-child {
+    flex-basis: calc(100% - 105px);
+  }
+  .registration-fields button {
+    width: 100%;
+  }
+  .editor-actions .button {
+    flex: 1 1 40%;
+  }
+  .editor-paste {
+    flex-wrap: wrap;
+  }
+  .editor-paste label {
+    flex-basis: 100%;
+  }
+}
+.mobile-settings {
+  display: none;
+}
+@media (max-width: 600px) {
+  .mobile-settings {
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: none;
+    color: #7e9274;
+    width: 25px;
+    height: 25px;
+    padding: 3px;
+  }
+  .topbar-right {
+    gap: 7px;
+  }
+}

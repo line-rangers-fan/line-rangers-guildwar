@@ -21,6 +21,7 @@ console.log(
       guildSource: gs.source,
       guildFetchedAt: gs.fetchedAt,
       memberSource: m.source,
+      rosterMode: m.mode,
       memberCount: m.members.length,
       week: c.dates,
       stale: gs.stale || m.stale,

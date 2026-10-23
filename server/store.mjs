@@ -6,8 +6,58 @@ export function openStore(path) {
   const db = new DatabaseSync(path);
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
     CREATE TABLE IF NOT EXISTS checks(gid TEXT NOT NULL,team TEXT NOT NULL,uid TEXT NOT NULL,day TEXT NOT NULL,slot INTEGER NOT NULL CHECK(slot IN(1,2)), checked INTEGER NOT NULL CHECK(checked IN(0,1)),updated_at TEXT NOT NULL, PRIMARY KEY(gid,team,uid,day,slot));
-    CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY,payload TEXT NOT NULL,source TEXT NOT NULL,fetched_at TEXT NOT NULL);`);
+    CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY,payload TEXT NOT NULL,source TEXT NOT NULL,fetched_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS local_guilds(gid TEXT PRIMARY KEY,payload TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS rosters(gid TEXT PRIMARY KEY,payload TEXT NOT NULL,mode TEXT NOT NULL,observed_at TEXT,updated_at TEXT NOT NULL);`);
   return {
+    listLocalGuilds() {
+      return db
+        .prepare("SELECT payload FROM local_guilds ORDER BY gid")
+        .all()
+        .map((r) => JSON.parse(r.payload));
+    },
+    putLocalGuild(guild) {
+      db.prepare(
+        "INSERT INTO local_guilds VALUES(?,?) ON CONFLICT(gid) DO UPDATE SET payload=excluded.payload",
+      ).run(guild.gid, JSON.stringify(guild));
+    },
+    getRoster(gid) {
+      const r = db.prepare("SELECT * FROM rosters WHERE gid=?").get(gid);
+      return r
+        ? {
+            data: JSON.parse(r.payload),
+            mode: r.mode,
+            fetchedAt: r.observed_at,
+            updatedAt: r.updated_at,
+            source: "local:roster",
+            stale: false,
+          }
+        : null;
+    },
+    putRoster(gid, data, mode = "manual", observedAt = null) {
+      const now = new Date().toISOString();
+      db.prepare(
+        "INSERT INTO rosters VALUES(?,?,?,?,?) ON CONFLICT(gid) DO UPDATE SET payload=excluded.payload,mode=excluded.mode,observed_at=excluded.observed_at,updated_at=excluded.updated_at",
+      ).run(gid, JSON.stringify(data), mode, observedAt, now);
+      return this.getRoster(gid);
+    },
+    migrateCachedRosters() {
+      const guilds = this.getCache("guilds")?.data || [];
+      for (const row of db
+        .prepare("SELECT * FROM cache WHERE key LIKE 'members:%'")
+        .all()) {
+        const gid = row.key.slice(8);
+        if (this.getRoster(gid)) continue;
+        this.putRoster(
+          gid,
+          JSON.parse(row.payload),
+          "snapshot",
+          row.fetched_at,
+        );
+        const guild = guilds.find((g) => g.gid === gid);
+        if (guild) this.putLocalGuild(guild);
+      }
+    },
     getChecks(gid, team, from, to) {
       const rows = db
         .prepare(

@@ -2,10 +2,11 @@ import { openStore } from "./store.mjs";
 import { createSources } from "./sources.mjs";
 import { createApp } from "./app.mjs";
 const store = openStore(process.env.DATABASE_PATH || "./data/guildwar.sqlite");
+store.migrateCachedRosters();
 const sources = createSources(store, {
   guildURL: process.env.GUILD_SOURCE_URL,
   fallbackURL: process.env.GUILD_FALLBACK_URL,
-  memberBase: process.env.MEMBER_SOURCE_BASE,
+  memberURL: process.env.MEMBER_SOURCE_URL,
 });
 const app = createApp({
   store,

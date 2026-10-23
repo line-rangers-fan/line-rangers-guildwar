@@ -1,5 +1,11 @@
 # 情報源調査 — 2026-10-23 UTC
 
+## 閉鎖対応後の現行構成
+
+元サイトのAPIへの通常の通信は撤去した。一覧はLericoとローカルギルド登録の組み合わせ、名簿と攻撃記録は自分のSQLiteで管理する。旧キャッシュは起動時に保存名簿へ移行する。以下の元サイト調査・メンバーAPIの記載は旧構成の調査記録であり、現行の取得先ではない。
+
+GitHubの公開リポジトリ・コード検索とLericoの配信コードから、独立して全ギルドメンバーを取得できる公式の公開APIは見つかっていない。手動運用を成立させ、独立した名簿APIが得られた場合のみ環境変数で追加できる構成にした。
+
 ## 最初の参考サイト
 
 - 画面： https://line-ranger-guild-war.onrender.com/guildWarCount
@@ -20,7 +26,7 @@
 
 ## メンバー
 
-- 元サイトと同じ読み取りAPI `GET https://rangers-api-3mfw.onrender.com/api/guild-member-info/{gid}/members` を採用。
+- 元サイトと同じ読み取りAPI `GET https://rangers-api-3mfw.onrender.com/api/guild-member-info/{gid}/members` を旧実装で採用。現行では呼び出さない。
 - 実際に50人の `uid, userName, level, pvpLeaguePhase` を取得した。
 - そのAPIのさらに上流のゲーム通信、認証方法、収集コードは未確認。LINE公式APIであるとは表示しない。
 - このアプリケーションは第三者の保存用APIを呼ばない。攻撃記録の取得・更新は自前のSQLiteで完結する。
