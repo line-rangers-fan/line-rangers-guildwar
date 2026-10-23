@@ -96,10 +96,15 @@ export function reconcileRoster(previous, incoming, newId = () => `rb-${crypto.r
       // There is no game UID in the public feed. Keep an unchanged duplicate
       // group intact; never assign one account's checks to another by order.
       const levels = (list, field) => list.map((m) => m[field]).sort((a,b) => a-b).join(",");
-      if (rows.length !== old.length || levels(rows, "level") !== levels(old, "level"))
+      if (old.length === 0) {
+        duplicates = true;
+        data.push(...rows.map((row) => ({ uid: newId(), userName: name, level: row.level, pvpLeaguePhase: "" })));
+      } else if (rows.length !== old.length || levels(rows, "level") !== levels(old, "level"))
         throw new Error("同名メンバーを区別できません。「名簿を管理」で確認してください。既存の名簿・攻撃記録は維持しています。");
-      duplicates = true;
-      data.push(...old);
+      else {
+        duplicates = true;
+        data.push(...old);
+      }
     } else {
       const existing = old[0];
       data.push({ uid: existing?.uid || newId(), userName: name, level: rows[0].level, pvpLeaguePhase: existing?.pvpLeaguePhase || "" });

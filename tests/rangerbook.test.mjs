@@ -34,6 +34,9 @@ test("existing IDs survive updates; renames get new IDs; ambiguous duplicates ca
   assert.equal(updated.data[0].uid, "old-id");
   assert.equal(updated.data[0].pvpLeaguePhase, "LEGEND");
   assert.equal(reconcileRoster(previous, [{ name: "改名", level: 500 }], () => "new-id").data[0].uid, "new-id");
+  const firstDuplicate = reconcileRoster([], [{ name: "名前", level: 499 }, { name: "名前", level: 500 }], (() => { let i = 0; return () => `new-${++i}`; })());
+  assert.equal(firstDuplicate.data.length, 2);
+  assert.notEqual(firstDuplicate.data[0].uid, firstDuplicate.data[1].uid);
   assert.throws(() => reconcileRoster(previous, [{ name: "名前", level: 500 }, { name: "名前", level: 499 }]));
   const duplicate = [...previous, { uid: "other-id", userName: "名前", level: 400, pvpLeaguePhase: "" }];
   assert.deepEqual(reconcileRoster(duplicate, [{ name: "名前", level: 400 }, { name: "名前", level: 499 }]).data, duplicate);
