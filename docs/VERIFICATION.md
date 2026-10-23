@@ -26,3 +26,11 @@ GitHub新規リポジトリ作成は、GraphQL `createRepository` とREST `POST 
 - 同条件のChromiumで、画面からギルド作成→2人の名簿作成→チェック保存→再読み込み→改名→JSON書き出し・取り込みを確認。改名後もチェックを保持。
 - PC 1440×1000、スマートフォン390×844で確認。JavaScriptエラー0、画面全体の横はみ出しなし。
 - メンバーの独立した自動更新は未実現。初期設定は手動名簿運用であり、画面とREADMEにも明記。
+
+## 本番公開
+
+- 公開先： https://line-rangers-guildwar.eagerowl2.chatgpt.site/guildWarCount
+- ホスト：SitesのCloudflare Worker。共有データはD1の `cache / checks / local_guilds / rosters` に保存。
+- D1テーブルの作成と、未ログインでのヘルスチェック成功を確認。
+- 2ギルド・99人の保存名簿を公開DBへ移行。全5,000ギルドの名簿を保存したという意味ではない。
+- 公開APIでチェック保存→再取得を確認し、テストで変更したチェックは元の状態へ復元。

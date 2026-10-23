@@ -2,6 +2,14 @@
 
 LINEレンジャーのギルドランキング、メンバー名簿、ギルド戦攻撃チェックを共有する非公式サイトです。閉鎖予定の元サイトへの通信は行わず、名簿・攻撃記録を自分のSQLiteに保存します。React + Node.js + SQLite で動作します。LINEおよびゲーム運営会社とは関係ありません。
 
+## 公開サイト
+
+https://line-rangers-guildwar.eagerowl2.chatgpt.site/guildWarCount
+
+公開版はCloudflare WorkersとD1を使用し、名簿・攻撃チェックはD1に永続保存します。ローカル版は引き続きNode.jsとSQLiteで動作します。既存のRender定義は代替の公開先として残しています。
+
+公開版のビルド・検証は `npm run build:worker` と `node scripts/check-worker.mjs` です。ホスティング設定は `.openai/hosting.json`、DBスキーマは `db/schema.ts`、適用済みの生成SQLと履歴は `drizzle/` にあります。変更時は `npm run db:generate` で新しいマイグレーションを追加し、適用済みSQLは編集しないでください。
+
 ## 起動
 
 Node.js 24以降を使用します。

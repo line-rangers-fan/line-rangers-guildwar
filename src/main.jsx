@@ -172,6 +172,7 @@ function App() {
             : {
                 ...s,
                 ally:
+                  sorted.find((g) => g.local && g.nationalFlag === "JP")?.gid ||
                   sorted.find((g) => g.nationalFlag === "JP")?.gid ||
                   sorted[0]?.gid ||
                   r.guilds[0]?.gid ||
