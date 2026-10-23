@@ -314,3 +314,19 @@
  .compact-checker .compact-member-table thead th { padding: 2px 0; }
  .compact-checker .table-footer { padding: 1px 3px; }
 }
+
+
+/* Name-first attack roster: no avatars, level or league metadata. */
+.compact-checker .player-avatar,
+.compact-checker .member-name small,
+.compact-checker .player .level,
+.compact-checker .player .league,
+.compact-checker .member-table .row-number { display: none !important; }
+.compact-checker .player { gap: 0; min-width: 0; max-width: none; }
+.compact-checker .member-name { text-align: left; }
+.compact-checker .compact-member-table thead th:first-child,
+.compact-checker .compact-member-table tbody .member-name { padding-left: 3px !important; }
+@media (max-width: 600px) {
+ .compact-checker .compact-member-table tbody .member-name { padding-left: 2px !important; }
+ .compact-checker .compact-member-table thead th:first-child { padding-left: 2px !important; }
+}
