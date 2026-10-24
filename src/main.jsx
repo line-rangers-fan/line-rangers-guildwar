@@ -13,7 +13,7 @@ import { apiURL, pagePath, publicBoardURL, transferToPublicSite, transferMessage
 import { loadPrivateBoard, savePrivateBoard, checkedEntries } from "../shared/boards.mjs";
 import { groupMembers } from "../shared/checklist.mjs";
 import { AttackControl } from "./AttackControl.jsx";
-import { PREFERENCES_KEY, loadPersonal } from "../shared/personal.mjs";
+import { PREFERENCES_KEY, loadPersonal, initialChoice, resetPersonal } from "../shared/personal.mjs";
 import { RosterEditor, GuildRegistration } from "./RosterEditor.jsx";
 
 function Icon({ name, size = 20, ...props }) {
@@ -86,12 +86,18 @@ const countries = {
   VN: "ベトナム",
 };
 const query = new URLSearchParams(location.search);
+let resetWarning = "";
+if (query.get("reset") === "personal") {
+  try { resetPersonal(localStorage); }
+  catch { resetWarning = "このブラウザーの保存データを初期化できませんでした。ブラウザーのサイトデータ設定を確認してください。"; }
+  for (const key of ["reset", "gid", "enemyGid", "share", "day"]) query.delete(key);
+  history.replaceState(null, "", location.pathname + (query.size ? `?${query}` : ""));
+}
 function readPersonal() {
   try { return loadPersonal(localStorage); } catch { return loadPersonal({ getItem: () => null }); }
 }
 function loadChoice() {
-  const s = readPersonal().selection;
-  return { ally: query.get("gid") || s.ally, enemy: query.get("enemyGid") || s.enemy };
+  return initialChoice(query);
 }
 function App() {
   const [view, setView] = useState(
@@ -102,7 +108,7 @@ function App() {
     [guildLoading, setGuildLoading] = useState(true);
   const initialPersonal = useMemo(readPersonal, []);
   const [registeredGuilds, setRegisteredGuilds] = useState(initialPersonal.guilds);
-  const [storageWarning, setStorageWarning] = useState("");
+  const [storageWarning, setStorageWarning] = useState(resetWarning);
   const [selection, setSelection] = useState(loadChoice);
   const team = "ally";
   const [sharing, setSharing] = useState(query.get("share") === "1");
@@ -190,15 +196,14 @@ function App() {
     try {
       if (!sharing) personalSelection.current = selection;
       localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ guilds: registeredGuilds, selection: personalSelection.current, team, sort, filterDay, filter }));
-      setStorageWarning("");
+      setStorageWarning(resetWarning);
     } catch { setStorageWarning("このブラウザーでは登録情報を保存できません。再訪時の維持には、ストレージを許可した通常のブラウザーをご利用ください。"); }
     const q = new URLSearchParams();
-    if (sharing) { q.set("share", "1"); q.set("day", currentDay); }
-    if (selection.ally) q.set("gid", selection.ally);
+    if (sharing) { q.set("share", "1"); q.set("day", currentDay); if (selection.ally) q.set("gid", selection.ally); }
     history.replaceState(
       null,
       "",
-      `${pagePath(view)}?${q}`,
+      `${pagePath(view)}${q.size ? `?${q}` : ""}`,
     );
   }, [selection, team, view, registeredGuilds, sort, filterDay, filter, sharing, currentDay]);
   useEffect(() => {
@@ -214,14 +219,9 @@ function App() {
       if (sharing) return api(`/api/guilds/${gid}/checks?team=${team}&week=${week}`, { signal: c.signal });
       const saved = loadPrivateBoard(localStorage, gid, week);
       if (saved.exists) return { states: saved.states };
-      let states = {}, migrated = false;
-      if (initialPersonal.guilds.some((g) => g.gid === gid)) {
-        const previous = await api(`/api/guilds/${gid}/checks?team=${team}&week=${week}`, { signal: c.signal });
-        states = previous.states;
-        migrated = Object.keys(states).length > 0;
-      }
+      const states = {};
       if (!c.signal.aborted) savePrivateBoard(localStorage, gid, week, states);
-      return { states, migrated };
+      return { states };
     }
     Promise.all([
       api(`/api/guilds/${gid}/members`, { signal: c.signal }),

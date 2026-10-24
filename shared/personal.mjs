@@ -31,3 +31,17 @@ export function memberComparator(sort) {
     return (sort.key === "level" ? -sort.dir * byLevel : sort.dir * name) || name || a.uid.localeCompare(b.uid);
   };
 }
+
+// Only explicit shared links may preselect a guild from the address.
+export function initialChoice(params) {
+  const gid = params.get("gid");
+  return { ally: params.get("share") === "1" && validId(gid) ? gid : "", enemy: "" };
+}
+export function resetPersonal(storage) {
+  const keys = [];
+  for (let i = 0; i < storage.length; i++) {
+    const key = storage.key(i);
+    if (key === PREFERENCES_KEY || key === "guildwar-selection" || key?.startsWith("guildwar-private-checks:")) keys.push(key);
+  }
+  for (const key of keys) storage.removeItem(key);
+}

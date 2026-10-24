@@ -30,3 +30,17 @@ test('limited directory and stored-roster check saves work without member source
  const response=await fetch(base+'/api/guilds/g-1/checks',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({uid:'u-1',team:'ally',day:'2026-10-23',slot:2,checked:true})});assert.equal(response.status,200);const saved=await response.json();assert.equal(saved.states['u-1']['2026-10-23'][1],true);assert.equal(calls,0);
  }finally{await new Promise(r=>server.close(r));store.close();}
 });
+
+test('ordinary links always start unselected; only shared links can select a guild', async () => {
+  const {initialChoice}=await import('../shared/personal.mjs');
+  for(const query of ['', 'gid=colors', 'gid=colors&day=2026-10-21', 'share=0&gid=colors', 'share=1&gid=bad%2Fid']) {
+    assert.deepEqual(initialChoice(new URLSearchParams(query)),{ally:'',enemy:''});
+  }
+  assert.deepEqual(initialChoice(new URLSearchParams('share=1&gid=colors')),{ally:'colors',enemy:''});
+});
+test('personal reset clears only this app personal records', async () => {
+  const {resetPersonal,PREFERENCES_KEY}=await import('../shared/personal.mjs');
+  const data=new Map([[PREFERENCES_KEY,'{}'],['guildwar-selection','{}'],['guildwar-private-checks:colors','{}'],['unrelated','keep']]);
+  resetPersonal({get length(){return data.size},key:i=>[...data.keys()][i],removeItem:k=>data.delete(k)});
+  assert.deepEqual([...data],[['unrelated','keep']]);
+});
