@@ -5,11 +5,13 @@ import {
   remaining,
   weekDates,
   gameDate,
+  levelLabel,
 } from "../shared/domain.mjs";
 import "./style.css";
 import "./compact.css";
+import { groupMembers } from "../shared/checklist.mjs";
 import { AttackControl } from "./AttackControl.jsx";
-import { PREFERENCES_KEY, loadPersonal, validSort, memberComparator } from "../shared/personal.mjs";
+import { PREFERENCES_KEY, loadPersonal, validSort } from "../shared/personal.mjs";
 import { RosterEditor, GuildRegistration } from "./RosterEditor.jsx";
 
 function Icon({ name, size = 20, ...props }) {
@@ -99,18 +101,15 @@ function App() {
   const initialPersonal = useMemo(readPersonal, []);
   const [registeredGuilds, setRegisteredGuilds] = useState(initialPersonal.guilds);
   const [storageWarning, setStorageWarning] = useState("");
-  const [selection, setSelection] = useState(loadChoice),
-    [team, setTeam] = useState(
-      ["ally", "enemy"].includes(query.get("team")) ? query.get("team") : initialPersonal.team,
-    );
+  const [selection, setSelection] = useState(loadChoice);
+  const team = "ally";
   const [country, setCountry] = useState(""),
     [tier, setTier] = useState(""),
     [tierResponse, setTierResponse] = useState(null),
     [search, setSearch] = useState(""),
     [rankLimit, setRankLimit] = useState("500");
   const [today, setToday] = useState(gameDate()),
-    [filterDay, setFilterDay] = useState(""),
-    [checkerTools, setCheckerTools] = useState(false),
+    [filterDay, setFilterDay] = useState(initialPersonal.filterDay),
     [roster, setRoster] = useState(null),
     [states, setStates] = useState({}),
     [rosterLoading, setRosterLoading] = useState(false),
@@ -118,7 +117,7 @@ function App() {
     [saving, setSaving] = useState(false),
     [saved, setSaved] = useState("");
   const [memberSearch, setMemberSearch] = useState(""),
-    [filter, setFilter] = useState("all"),
+    [filter, setFilter] = useState(initialPersonal.filter),
     [sort, setSort] = useState(initialPersonal.sort),
     [page, setPage] = useState(1),
     [rankSort, setRankSort] = useState({ key: "lastGuildWarRank", dir: 1 });
@@ -146,7 +145,7 @@ function App() {
   }, [refresh]);
   const week = weekDates(today)[0];
   const dates = useMemo(() => weekDates(week), [week]);
-  const currentDay = dates.includes(filterDay) ? filterDay : dates.find((d) => d >= today) || dates[2];
+  const currentDay = dates.includes(filterDay) ? filterDay : [...dates].reverse().find((d) => d <= today) || dates[0];
   useEffect(() => {
     const t = setInterval(() => setToday(gameDate()), 30000);
     const refreshData = setInterval(() => {
@@ -190,19 +189,17 @@ function App() {
   }, [refresh]);
   useEffect(() => {
     try {
-      localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ guilds: registeredGuilds, selection, team, sort }));
+      localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ guilds: registeredGuilds, selection, team, sort, filterDay, filter }));
       setStorageWarning("");
     } catch { setStorageWarning("このブラウザーでは登録情報を保存できません。再訪時の維持には、ストレージを許可した通常のブラウザーをご利用ください。"); }
     const q = new URLSearchParams();
     if (selection.ally) q.set("gid", selection.ally);
-    if (selection.enemy) q.set("enemyGid", selection.enemy);
-    q.set("team", team);
     history.replaceState(
       null,
       "",
       `${view === "ranking" ? "/guild-tracker" : "/guildWarCount"}?${q}`,
     );
-  }, [selection, team, view, registeredGuilds, sort]);
+  }, [selection, team, view, registeredGuilds, sort, filterDay, filter]);
   useEffect(() => {
     const seq = ++generation.current;
     const c = new AbortController();
@@ -335,21 +332,12 @@ function App() {
     [guilds, country, search, rankLimit, tier],
   );
   const dayRemaining = remaining(members, states, currentDay);
-  const visibleMembers = useMemo(
-    () =>
-      members
-        .filter(
-          (m) =>
-            m.userName.toLowerCase().includes(memberSearch.toLowerCase()) &&
-            (filter === "all" ||
-              (filter === "remaining" &&
-                [1, 2].some((s) => !checked(states, m.uid, currentDay, s))) ||
-              (filter === "none" &&
-                [1, 2].every((s) => !checked(states, m.uid, currentDay, s)))),
-        )
-        .sort(memberComparator(sort)),
-    [members, memberSearch, filter, states, currentDay, sort],
-  );
+  const memberGroups = useMemo(() => groupMembers(
+    members.filter((m) => m.userName.toLowerCase().includes(memberSearch.toLowerCase())),
+    states, currentDay, filter, sort,
+  ), [members, memberSearch, states, currentDay, filter, sort]);
+  const visibleMembers = memberGroups.flatMap((group) => group.members);
+  const dayLabel = `${currentDay.slice(5).replace("-", "/")}（${["水", "金", "日"][dates.indexOf(currentDay)]}）`;
   const rankedGuilds = useMemo(
     () =>
       [...listedGuilds].sort((a, b) => {
@@ -374,7 +362,7 @@ function App() {
   function registerPersonal(g) {
     setRegisteredGuilds((saved) => saved.some((r) => r.gid === g.gid) ? saved : [...saved, g]);
     setSelection((s) => ({ ...s, [team]: g.gid }));
-    setRegisterGuild(false); setCheckerTools(false); setView("checker"); setMemberSearch(""); setFilter("all");
+    setRegisterGuild(false); setView("checker"); setMemberSearch(""); setFilter("all");
     announce("自分の登録リストに追加しました");
   }
   function removePersonal() {
@@ -567,7 +555,7 @@ function App() {
               <span>公開名簿の取得と、攻撃記録の共有</span>
             </div>
           )}
-          {tierResponse?.stale && (view === "ranking" || checkerTools) && <div className="alert warning" role="status">{tierResponse.warning || "階級情報の更新が止まっています。保存済みの階級を表示しています。"}{tier && <button className="text-button" onClick={() => setTier("")}>すべて表示</button>}</div>}
+          {tierResponse?.stale && <div className="alert warning" role="status">{tierResponse.warning || "階級情報の更新が止まっています。保存済みの階級を表示しています。"}{tier && <button className="text-button" onClick={() => setTier("")}>すべて表示</button>}</div>}
           {storageWarning && <div className="alert warning" role="alert">{storageWarning}</div>}
           {registerGuild && <GuildRegistration guilds={guilds} registeredGuilds={registeredGuilds} loading={guildLoading} error={guildError} onClose={() => setRegisterGuild(false)} onRegister={registerPersonal} />}
           {settings && (
@@ -577,7 +565,7 @@ function App() {
                 対応ギルドはRangerbookの公開名簿から取得できます。名簿と攻撃記録はこのサイトのDBに保存します。攻撃結果はゲーム内で確認してください。各曜日の「1回目」「2回目」をチェックします。2回目をチェックすると1回目も記録され、1回目を外すと2回目も外れます。
               </p>
               <p>
-                味方と敵で別々のギルドを選べます。チェックはこのサイトのサーバーに保存し、他の端末には約15秒で反映します。週は月曜〜日曜、日付は日本時間09:00に切り替わります。
+                自分の登録ギルドから表示先を選べます。チェックはこのサイトのサーバーに保存し、他の端末には約15秒で反映します。週は月曜〜日曜、日付は日本時間09:00に切り替わります。
               </p>
               {health?.writeProtected ? (
                 <label>
@@ -624,28 +612,7 @@ function App() {
           )}
           {view === "checker" ? (
             <>
-              <div className="team-toolbar">
-                <div className="segmented">
-                  <button
-                    className={team === "ally" ? "selected" : ""}
-                    onClick={() => setTeam("ally")}
-                    disabled={saving}
-                  >
-                    <span className="dot green" />
-                    味方チーム
-                  </button>
-                  <button
-                    className={team === "enemy" ? "selected" : ""}
-                    onClick={() => setTeam("enemy")}
-                    disabled={saving}
-                  >
-                    <span className="dot orange" />
-                    敵チーム
-                  </button>
-                </div>
-                <button className="checker-options" aria-expanded={checkerTools} aria-controls="checker-options-panel" onClick={() => setCheckerTools((v) => !v)}>設定</button>
-              </div>
-              {(checkerTools || !gid) && <section id="checker-options-panel" className="panel checker-options-panel">
+              <section id="checker-options-panel" className="panel checker-options-panel">
                 <div className="checker-actions">
                   <button className="button" onClick={() => setView("ranking")}>ランキング</button>
                   <button className="button" onClick={() => setRefresh((n) => n + 1)} disabled={guildLoading || rosterLoading || saving}>更新</button>
@@ -659,16 +626,18 @@ function App() {
                   </select>
                 </label>
                 <p className="personal-note">登録と並び順はこのブラウザーに保存。攻撃チェックはギルドで共有します。</p>
+                <div className="personal-list-actions">
                 {personalGuilds.some((g) => g.gid === gid) && <button className="text-button" onClick={removePersonal}>選択中のギルドの登録を解除</button>}
                 <button className="text-button register-in-selection" onClick={() => setRegisterGuild((v) => !v)}>＋ ギルドを登録</button>
-              </section>}
+                </div>
+              </section>
               {gid && (
                 <>
                   <div className="checklist-heading">
                     <h1>{guild?.name || "ギルド"} <small>{members.length}人</small></h1>
                     <span>{!registeredGuilds.some((g) => g.gid === gid) && guild && <button className="text-button" onClick={() => registerPersonal(guild)}>自分に登録</button>}{currentDay.slice(5).replace("-", "/")} 残り <b>{rosterLoading ? "—" : dayRemaining}</b>回</span>
                   </div>
-                  {(checkerTools || roster?.needsSetup) && <details
+                  <details
                     className="roster-details"
                     key={gid}
                     open={roster?.needsSetup || undefined}
@@ -723,7 +692,7 @@ function App() {
                         名簿を管理
                       </button>
                     </div>
-                  </details>}
+                  </details>
                   {editingRoster && (
                     <RosterEditor
                       key={gid}
@@ -759,14 +728,14 @@ function App() {
                       <select className="checklist-sort" aria-label="メンバーの並び順" value={`${sort.key}:${sort.dir}`} onChange={(e) => { const [key, dir] = e.target.value.split(":"); setSort(validSort({ key, dir: Number(dir) })); }}>
                         <option value="name:1">名前 ↑</option><option value="name:-1">名前 ↓</option><option value="level:-1">レベル ↓</option><option value="level:1">レベル ↑</option>
                       </select>
-                      <select aria-label="攻撃状況で絞り込み" value={filter} onChange={(e) => setFilter(e.target.value)}>
+                      <select aria-label="攻撃状況の表示順" value={filter} onChange={(e) => setFilter(e.target.value)}>
                         <option value="all">すべて</option>
-                        <option value="remaining">残りあり</option>
-                        <option value="none">未攻撃</option>
+                        <option value="remaining">残りあり↑</option>
+                        <option value="none">未攻撃↑</option>
                       </select>
                     </div>
                     <div className="checklist-caption">
-                      <span>チェック＝攻撃済み</span>
+                      <span><b className="ordering-day">対象：{dayLabel}</b>　チェック＝攻撃済み</span>
                       <span className="save-indicator" role="status">{saving ? "保存中…" : error ? "未保存" : saved ? "保存済み" : "自動保存"}</span>
                     </div>
                     {error && (
@@ -811,11 +780,13 @@ function App() {
                             </tr>
                           </thead>
                           <tbody>
-                            {visibleMembers.map((m) => {
+                            {memberGroups.flatMap((group) => [
+                              ...(group.key !== "all" ? [<tr className={`member-group-row group-${group.key}`} key={`section:${group.key}`}><th colSpan={7}>{group.label}<small>{group.members.length}人</small></th></tr>] : []),
+                              ...group.members.map((m) => {
                               return (
-                                <tr key={m.uid}>
+                                <tr key={m.uid} className="member-row" data-member-id={m.uid}>
                                   <th scope="row" className="member-name">
-                                    <strong>{m.userName}</strong>{sort.key === "level" && <small className="sort-level">Lv.{m.level}</small>}
+                                    <strong>{m.userName}</strong>{sort.key === "level" && <small className="sort-level">{levelLabel(m.level)}</small>}
                                   </th>
                                   {dates.flatMap((d) => [1, 2].map((slot) => (
                                     <td key={`${d}-${slot}`} className={d === currentDay ? "selected-day check-cell" : "check-cell"}>
@@ -825,13 +796,14 @@ function App() {
                                         slot={slot}
                                         value={checked(states, m.uid, d, slot)}
                                         disabled={saving}
-                                        onChange={(value) => save(m.uid, d, slot, value)}
+                                        onChange={(value) => { setFilterDay(d); save(m.uid, d, slot, value); }}
                                       />
                                     </td>
                                   )))}
                                 </tr>
                               );
-                            })}
+                            }),
+                            ])}
                           </tbody>
                         </table>
                         {!visibleMembers.length && (
@@ -843,7 +815,7 @@ function App() {
                         )}
                       </div>
                     )}
-                    <div className="table-footer"><span>日付を選ぶと、その日の未攻撃で絞り込めます。</span><span>{visibleMembers.length} / {members.length}人</span></div>
+                    <div className="table-footer"><span>曜日を選ぶと、その日の攻撃状況で並べ替えます。</span><span>{visibleMembers.length} / {members.length}人</span></div>
                   </section>
                 </>
               )}
@@ -983,7 +955,7 @@ function App() {
               </section>
             </>
           )}
-          {(view === "ranking" || checkerTools) && <details className="source-details">
+          <details className="source-details">
             <summary>データ取得元・取得日時</summary>
             <p>
               ギルド一覧：
@@ -1012,7 +984,7 @@ function App() {
             <p>
               ゲーム情報が最新とは限りません。ギルド一覧の取得が停止しても、保存済み・手動登録のギルドと名簿で攻撃チェックを継続できます。
             </p>
-          </details>}
+          </details>
           <footer>
             <span>
               LINE RANGERS <b>GUILD WAR</b>

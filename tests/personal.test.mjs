@@ -11,7 +11,7 @@ test('directory excludes synthetic duplicate guilds and caps ranked candidates a
 test('personal lists survive serialization, stay isolated, and handle malformed storage',()=>{
  const data={guilds:[allGuilds[0],allGuilds[0]],selection:{ally:'g-1',enemy:'g-2'},team:'enemy',sort:{key:'level',dir:-1}};
  const a=loadPersonal({getItem:k=>k===PREFERENCES_KEY?JSON.stringify(data):null});const b=loadPersonal({getItem:()=>null});
- assert.equal(a.guilds.length,1);assert.equal(a.selection.ally,'g-1');assert.equal(a.team,'enemy');assert.deepEqual(a.sort,data.sort);assert.equal(b.guilds.length,0);
+ assert.equal(a.guilds.length,1);assert.equal(a.selection.ally,'g-1');assert.equal(a.team,'ally');assert.deepEqual(a.sort,data.sort);assert.equal(b.guilds.length,0);
  assert.equal(loadPersonal({getItem:()=>'{bad'}).guilds.length,0);
  assert.equal(loadPersonal({getItem:()=>{throw Error('disabled')}}).selection.ally,'');
  const legacy=loadPersonal({getItem:k=>k==='guildwar-selection'?'{"ally":"g-1","enemy":"local-fake"}':null});assert.equal(legacy.selection.ally,'g-1');assert.equal(legacy.selection.enemy,'');

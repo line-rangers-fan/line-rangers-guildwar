@@ -67,7 +67,7 @@ export function leagueLabel(p) {
 export function levelLabel(n) {
   if (n < 100) return `Lv${n}`;
   const i = Math.min(4, Math.floor((n - 100) / 99));
-  return `${["M", "S", "U", "L", "S′"][i]}${n - 99 * (i + 1)}`;
+  return `${["M", "S", "U", "L", "SL"][i]}${n - 99 * (i + 1)}`;
 }
 export function checked(states, uid, day, slot) {
   return states?.[uid]?.[day]?.[slot] === true;

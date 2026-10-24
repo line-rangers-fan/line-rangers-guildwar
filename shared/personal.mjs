@@ -12,7 +12,7 @@ export function validSort(sort) {
   return ["name", "level"].includes(sort?.key) && [1, -1].includes(sort?.dir) ? { key: sort.key, dir: sort.dir } : { ...DEFAULT_SORT };
 }
 export function loadPersonal(storage) {
-  const empty = { guilds: [], selection: { ally: "", enemy: "" }, team: "ally", sort: { ...DEFAULT_SORT } };
+  const empty = { guilds: [], selection: { ally: "", enemy: "" }, team: "ally", sort: { ...DEFAULT_SORT }, filterDay: "", filter: "all" };
   try {
     const data = JSON.parse(storage.getItem(PREFERENCES_KEY) || "null");
     const selection = data?.selection || JSON.parse(storage.getItem("guildwar-selection") || "{}");
@@ -21,7 +21,7 @@ export function loadPersonal(storage) {
       if (!validId(g?.gid) || g.gid.startsWith("local-") || typeof g.name !== "string" || !g.name.trim() || seen.has(g.gid)) return false;
       seen.add(g.gid); return true;
     }).slice(0, 500);
-    return { guilds, selection: Object.fromEntries(["ally", "enemy"].map((team) => [team, validId(selection?.[team]) && !selection[team].startsWith("local-") ? selection[team] : ""])), team: data?.team === "enemy" ? "enemy" : "ally", sort: validSort(data?.sort) };
+    return { guilds, selection: Object.fromEntries(["ally", "enemy"].map((team) => [team, validId(selection?.[team]) && !selection[team].startsWith("local-") ? selection[team] : ""])), team: "ally", sort: validSort(data?.sort), filterDay: typeof data?.filterDay === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.filterDay) ? data.filterDay : "", filter: ["all", "remaining", "none"].includes(data?.filter) ? data.filter : "all" };
   } catch { return empty; }
 }
 export function memberComparator(sort) {
