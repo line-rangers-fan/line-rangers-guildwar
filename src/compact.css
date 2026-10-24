@@ -75,13 +75,11 @@ input.attack-check:disabled { cursor:wait; }
 .personal-registration > label, .personal-picker-filters label, .personal-guild-field { display:grid; gap:5px; font-size:12px; }
 .personal-registration > .primary { margin-top:12px; width:100%; }
 .personal-note { font-size:11px; color:#75816d; line-height:1.5; }
-.checklist-tools select.checklist-sort { width:102px; }
 .sort-level { margin-left:5px; font-size:9px; color:#829077; font-weight:400; white-space:nowrap; }
 @media(max-width:600px) {
  .checklist-tools { gap:4px; }
  .checklist-tools input { padding:5px; }
  .checklist-tools select { width:82px; padding:5px 3px; }
- .checklist-tools select.checklist-sort { width:84px; }
  .personal-picker-filters { grid-template-columns:minmax(0, 1fr) 105px; gap:8px; }
 }
 

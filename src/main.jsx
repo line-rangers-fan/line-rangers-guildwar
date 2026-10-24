@@ -13,7 +13,7 @@ import { apiURL, pagePath, publicBoardURL, transferToPublicSite, transferMessage
 import { loadPrivateBoard, savePrivateBoard, checkedEntries } from "../shared/boards.mjs";
 import { groupMembers } from "../shared/checklist.mjs";
 import { AttackControl } from "./AttackControl.jsx";
-import { PREFERENCES_KEY, loadPersonal, validSort } from "../shared/personal.mjs";
+import { PREFERENCES_KEY, loadPersonal } from "../shared/personal.mjs";
 import { RosterEditor, GuildRegistration } from "./RosterEditor.jsx";
 
 function Icon({ name, size = 20, ...props }) {
@@ -121,7 +121,7 @@ function App() {
     [saving, setSaving] = useState(false);
   const [memberSearch, setMemberSearch] = useState(""),
     [filter, setFilter] = useState(initialPersonal.filter),
-    [sort, setSort] = useState(() => initialPersonal.sort.key === "level" ? { key: "level", dir: -1 } : { key: "name", dir: 1 }),
+    [sort] = useState({ key: "level", dir: -1 }),
     [page, setPage] = useState(1),
     [rankSort, setRankSort] = useState({ key: "lastGuildWarRank", dir: 1 });
   const [editingRoster, setEditingRoster] = useState(false),
@@ -451,7 +451,7 @@ function App() {
             <Icon name="shield" size={26} />
           </span>
           <span>
-            LINE RANGERS<small>GUILD WAR</small>
+            Guild War Board<small>LINE RANGERS</small>
           </span>
         </a>
         <div className="nav-label">GUILD MANAGEMENT</div>
@@ -527,11 +527,11 @@ function App() {
           <div className="page-heading">
             <div>
               <div className="eyebrow">
-                {view === "checker" ? "GUILD WAR CHECKER" : "GUILD RANKINGS"}
+                {view === "checker" ? "Guild War Board" : "GUILD RANKINGS"}
               </div>
               <h1>
                 {view === "checker"
-                  ? "ギルド戦 攻撃チェック"
+                  ? "Guild War Board"
                   : "ギルドランキング"}
               </h1>
               <p>
@@ -638,9 +638,6 @@ function App() {
                   <section className="panel roster-panel">
                     <div className="checklist-tools">
                       <input aria-label="メンバー検索" placeholder="名前で検索" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)} />
-                      <select className="checklist-sort" aria-label="メンバーの並び順" value={sort.key} onChange={(e) => setSort(validSort({ key: e.target.value, dir: e.target.value === "level" ? -1 : 1 }))}>
-                        <option value="name">名前</option><option value="level">レベル</option>
-                      </select>
                       <select aria-label="攻撃状況の表示順" value={filter} onChange={(e) => setFilter(e.target.value)}>
                         <option value="all">すべて</option>
                         <option value="attacked">攻撃済み</option>
@@ -674,7 +671,7 @@ function App() {
                           <thead>
                             <tr>
                               <th scope="col" rowSpan={2}>
-                                名前
+                                名前・レベル
                               </th>
                               {dates.map((d, i) => (
                                 <th scope="colgroup" colSpan={2} key={d} className={d === currentDay ? "selected-day day-heading" : "day-heading"}>
@@ -695,7 +692,7 @@ function App() {
                               return (
                                 <tr key={m.uid} className="member-row" data-member-id={m.uid}>
                                   <th scope="row" className="member-name">
-                                    <strong>{m.userName}</strong>{sort.key === "level" && <small className="sort-level">{levelLabel(m.level)}</small>}
+                                    <strong>{m.userName}</strong><small className="sort-level">{levelLabel(m.level)}</small>
                                   </th>
                                   {dates.flatMap((d) => [1, 2].map((slot) => (
                                     <td key={`${d}-${slot}`} className={d === currentDay ? "selected-day check-cell" : "check-cell"}>
