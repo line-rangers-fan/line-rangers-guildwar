@@ -1,4 +1,5 @@
 import express from "express";
+import { directoryGuilds } from "../shared/personal.mjs";
 import { randomUUID } from "node:crypto";
 import { normalizeMembers } from "./sources.mjs";
 import { resolve } from "node:path";
@@ -138,7 +139,7 @@ export function createApp({
   app.get("/api/guilds", async (req, res) => {
     const r = await sources.guilds();
     res.json({
-      guilds: r.data,
+      guilds: req.query.limit === "500" ? directoryGuilds(r.data) : r.data,
       source: r.source,
       fetchedAt: r.fetchedAt,
       stale: r.stale,
@@ -201,7 +202,7 @@ export function createApp({
           .status(400)
           .json({ error: "水・金・日の正しい日付を指定してください" });
       }
-      const r = await sources.members(req.params.gid);
+      const r = store.getRoster(req.params.gid) || await sources.members(req.params.gid);
       if (!r.data.some((m) => m.uid === uid))
         return res
           .status(400)

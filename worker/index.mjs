@@ -1,4 +1,5 @@
 import { createD1Store } from "./store.mjs";
+import { directoryGuilds } from "../shared/personal.mjs";
 import { createSources, normalizeMembers } from "../shared/sources.mjs";
 import { readCompactSnapshot } from "../shared/rangerbook.mjs";
 import { gameDate, validId, weekDates } from "../shared/domain.mjs";
@@ -102,7 +103,7 @@ export function createWorkerHandler(makeStore = createD1Store) {
         if (path === "/api/guilds" && request.method === "GET") {
           const r = await sources.guilds();
           return json({
-            guilds: r.data,
+            guilds: url.searchParams.get("limit") === "500" ? directoryGuilds(r.data) : r.data,
             source: r.source,
             fetchedAt: r.fetchedAt,
             stale: r.stale,
@@ -232,7 +233,7 @@ export function createWorkerHandler(makeStore = createD1Store) {
               400,
             );
           }
-          const r = await sources.members(gid);
+          const r = await store.getRoster(gid) || await sources.members(gid);
           if (!r.data.some((m) => m.uid === uid))
             return json(
               { error: "このギルドに登録されていないメンバーです" },

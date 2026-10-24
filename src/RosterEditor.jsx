@@ -236,71 +236,25 @@ export function RosterEditor({ gid, members, token, onSaved, onClose }) {
     </section>
   );
 }
-export function GuildRegistration({ token, onSaved, onClose }) {
-  const [name, setName] = useState(""),
-    [country, setCountry] = useState("JP"),
-    [error, setError] = useState(""),
-    [saving, setSaving] = useState(false);
-  async function save(e) {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-    try {
-      const r = await fetch("/api/guilds", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ name, nationalFlag: country }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
-      onSaved(d.guild);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setSaving(false);
-    }
-  }
+export function GuildRegistration({ guilds, registeredGuilds, loading, error, onRegister, onClose }) {
+  const [search, setSearch] = useState("");
+  const [limit, setLimit] = useState("500");
+  const [selected, setSelected] = useState("");
+  const choices = React.useMemo(() => guilds.filter((g) => g.lastGuildWarRank <= Number(limit) && g.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())), [guilds, limit, search]);
+  const chosen = choices.find((g) => g.gid === selected);
+  const already = registeredGuilds.some((g) => g.gid === selected);
   return (
-    <form className="panel roster-editor" onSubmit={save}>
-      <div className="editor-heading">
-        <h2>ギルドを登録</h2>
-        <button type="button" className="text-button" onClick={onClose}>
-          閉じる
-        </button>
+    <form className="panel roster-editor personal-registration" onSubmit={(e) => { e.preventDefault(); if (chosen) onRegister(chosen); }}>
+      <div className="editor-heading"><h2>自分のギルドを登録</h2><button type="button" className="text-button" onClick={onClose}>閉じる</button></div>
+      <p>上位500ギルドから選択できます。登録はこのブラウザーだけに保存され、他の人の登録リストには反映されません。</p>
+      <div className="personal-picker-filters">
+        <label>ギルド名で検索<input value={search} onChange={(e) => { setSearch(e.target.value); setSelected(""); }} placeholder="ギルド名を入力" /></label>
+        <label>順位の範囲<select value={limit} onChange={(e) => { setLimit(e.target.value); setSelected(""); }}><option value="100">上位100位</option><option value="200">上位200位</option><option value="500">上位500位</option></select></label>
       </div>
-      <p>外部サービスに掲載されていないギルドも登録できます。</p>
-      <div className="registration-fields">
-        <label>
-          ギルド名
-          <input
-            required
-            maxLength={100}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        <label>
-          国コード
-          <input
-            maxLength={2}
-            value={country}
-            onChange={(e) => setCountry(e.target.value.toUpperCase())}
-            placeholder="JP"
-            pattern="[A-Z]{2}|"
-          />
-        </label>
-        <button className="button primary" disabled={saving}>
-          {saving ? "保存中…" : "登録して名簿を作る"}
-        </button>
-      </div>
-      {error && (
-        <p role="alert" className="editor-error">
-          {error}
-        </p>
-      )}
+      <label>登録するギルド <small>{choices.length}件</small><select aria-label="登録するギルド" value={chosen ? selected : ""} onChange={(e) => setSelected(e.target.value)} disabled={loading} required><option value="">{loading ? "一覧を読み込み中…" : "ギルドを選んでください"}</option>{choices.map((g) => <option key={g.gid} value={g.gid}>#{g.lastGuildWarRank} {g.name}{registeredGuilds.some((r) => r.gid === g.gid) ? "（登録済み）" : ""}</option>)}</select></label>
+      {!loading && !choices.length && <p role="status">{error || "条件に一致するギルドがありません。検索条件を変えてください。"}</p>}
+      <p className="personal-note">公開名簿がない場合は、登録後に「名簿を管理」からメンバーを入力できます。</p>
+      <button className="button primary" type="submit" disabled={!chosen || loading}>{already ? "このギルドを表示" : "自分のリストに登録"}</button>
     </form>
   );
 }

@@ -9,6 +9,7 @@ import {
 import "./style.css";
 import "./compact.css";
 import { AttackControl } from "./AttackControl.jsx";
+import { PREFERENCES_KEY, loadPersonal, validSort, memberComparator } from "../shared/personal.mjs";
 import { RosterEditor, GuildRegistration } from "./RosterEditor.jsx";
 
 function Icon({ name, size = 20, ...props }) {
@@ -81,16 +82,12 @@ const countries = {
   VN: "ベトナム",
 };
 const query = new URLSearchParams(location.search);
+function readPersonal() {
+  try { return loadPersonal(localStorage); } catch { return loadPersonal({ getItem: () => null }); }
+}
 function loadChoice() {
-  try {
-    const s = JSON.parse(localStorage.getItem("guildwar-selection") || "{}");
-    return {
-      ally: query.get("gid") || s.ally || "",
-      enemy: query.get("enemyGid") || s.enemy || "",
-    };
-  } catch {
-    return { ally: query.get("gid") || "", enemy: query.get("enemyGid") || "" };
-  }
+  const s = readPersonal().selection;
+  return { ally: query.get("gid") || s.ally, enemy: query.get("enemyGid") || s.enemy };
 }
 function App() {
   const [view, setView] = useState(
@@ -99,9 +96,12 @@ function App() {
   const [guildResponse, setGuildResponse] = useState(null),
     [guildError, setGuildError] = useState(""),
     [guildLoading, setGuildLoading] = useState(true);
+  const initialPersonal = useMemo(readPersonal, []);
+  const [registeredGuilds, setRegisteredGuilds] = useState(initialPersonal.guilds);
+  const [storageWarning, setStorageWarning] = useState("");
   const [selection, setSelection] = useState(loadChoice),
     [team, setTeam] = useState(
-      query.get("team") === "enemy" ? "enemy" : "ally",
+      ["ally", "enemy"].includes(query.get("team")) ? query.get("team") : initialPersonal.team,
     );
   const [country, setCountry] = useState(""),
     [tier, setTier] = useState(""),
@@ -119,7 +119,7 @@ function App() {
     [saved, setSaved] = useState("");
   const [memberSearch, setMemberSearch] = useState(""),
     [filter, setFilter] = useState("all"),
-    [sort, setSort] = useState({ key: "name", dir: 1 }),
+    [sort, setSort] = useState(initialPersonal.sort),
     [page, setPage] = useState(1),
     [rankSort, setRankSort] = useState({ key: "lastGuildWarRank", dir: 1 });
   const [editingRoster, setEditingRoster] = useState(false),
@@ -134,7 +134,8 @@ function App() {
   const generation = useRef(0),
     revision = useRef(0),
     busy = useRef(false),
-    noticeTimer = useRef();
+    noticeTimer = useRef(),
+    migrationDone = useRef(false);
   const gid = selection[team];
   useEffect(() => {
     const c = new AbortController();
@@ -160,25 +161,21 @@ function App() {
     const c = new AbortController();
     setGuildLoading(true);
     setGuildError("");
-    api("/api/guilds", { signal: c.signal })
+    api("/api/guilds?limit=500", { signal: c.signal })
       .then((r) => {
         setGuildResponse(r);
-        const sorted = [...r.guilds]
-          .filter((g) => g.lastGuildWarRank > 0)
-          .sort((a, b) => a.lastGuildWarRank - b.lastGuildWarRank);
-        setSelection((s) =>
-          s.ally
-            ? s
-            : {
-                ...s,
-                ally:
-                  sorted.find((g) => g.local && g.nationalFlag === "JP")?.gid ||
-                  sorted.find((g) => g.nationalFlag === "JP")?.gid ||
-                  sorted[0]?.gid ||
-                  r.guilds[0]?.gid ||
-                  "",
-              },
-        );
+        // Migrate previous choices only when they match a real ranked guild ID.
+        if (!migrationDone.current) {
+          migrationDone.current = true;
+          setRegisteredGuilds((saved) => {
+          const combined = new Map(saved.map((g) => [g.gid, g]));
+          for (const id of Object.values(initialPersonal.selection)) {
+            const g = r.guilds.find((g) => g.gid === id);
+            if (g && !combined.has(id)) combined.set(id, g);
+          }
+          return combined.size === saved.length ? saved : [...combined.values()];
+          });
+        }
       })
       .catch((e) => {
         if (e.name !== "AbortError") setGuildError(e.message);
@@ -193,8 +190,9 @@ function App() {
   }, [refresh]);
   useEffect(() => {
     try {
-      localStorage.setItem("guildwar-selection", JSON.stringify(selection));
-    } catch {}
+      localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ guilds: registeredGuilds, selection, team, sort }));
+      setStorageWarning("");
+    } catch { setStorageWarning("このブラウザーでは登録情報を保存できません。再訪時の維持には、ストレージを許可した通常のブラウザーをご利用ください。"); }
     const q = new URLSearchParams();
     if (selection.ally) q.set("gid", selection.ally);
     if (selection.enemy) q.set("enemyGid", selection.enemy);
@@ -204,7 +202,7 @@ function App() {
       "",
       `${view === "ranking" ? "/guild-tracker" : "/guildWarCount"}?${q}`,
     );
-  }, [selection, team, view]);
+  }, [selection, team, view, registeredGuilds, sort]);
   useEffect(() => {
     const seq = ++generation.current;
     const c = new AbortController();
@@ -213,7 +211,7 @@ function App() {
     setSaved("");
     setRoster(null);
     setEditingRoster(false);
-    if (!gid) return () => c.abort();
+    if (!gid) { setRosterLoading(false); return () => c.abort(); }
     setRosterLoading(true);
     Promise.all([
       api(`/api/guilds/${gid}/members`, { signal: c.signal }),
@@ -271,6 +269,12 @@ function App() {
     busy.current = true;
     setSaving(true);
     setError("");
+    setSaved("");
+    const previousStates = states;
+    const nextDay = { ...states[uid]?.[day], [slot]: value };
+    if (slot === 2 && value) nextDay[1] = true;
+    if (slot === 1 && !value) nextDay[2] = false;
+    setStates({ ...states, [uid]: { ...states[uid], [day]: nextDay } });
     try {
       const r = await api(`/api/guilds/${gid}/checks`, {
         method: "PUT",
@@ -291,7 +295,10 @@ function App() {
         );
       }
     } catch (e) {
-      if (seq === generation.current) setError(e.message);
+      if (seq === generation.current) {
+        setStates(previousStates);
+        setError(e.message);
+      }
     } finally {
       busy.current = false;
       setSaving(false);
@@ -299,7 +306,8 @@ function App() {
   }
   const tiersByGuild = useMemo(() => new Map((tierResponse?.tiers || []).map((g) => [g.gid, g])), [tierResponse]);
   const guilds = useMemo(() => (guildResponse?.guilds || []).map((g) => ({ ...g, guildWarTier: tiersByGuild.get(g.gid)?.tier })), [guildResponse, tiersByGuild]);
-  const guild = guilds.find((g) => g.gid === gid);
+  const personalGuilds = useMemo(() => registeredGuilds.map((saved) => guilds.find((g) => g.gid === saved.gid) || saved), [guilds, registeredGuilds]);
+  const guild = guilds.find((g) => g.gid === gid) || personalGuilds.find((g) => g.gid === gid);
   const members = roster?.members || [];
   const countryList = useMemo(
     () =>
@@ -316,8 +324,7 @@ function App() {
             (!country || g.nationalFlag === country) &&
             (!tier || g.guildWarTier === tier) &&
             (!search || g.name.toLowerCase().includes(search.toLowerCase())) &&
-            (tier || g.local ||
-              rankLimit === "all" ||
+            (tier ||
               (g.lastGuildWarRank > 0 &&
                 g.lastGuildWarRank <= Number(rankLimit))),
         )
@@ -327,10 +334,6 @@ function App() {
         ),
     [guilds, country, search, rankLimit, tier],
   );
-  const selectedOptions =
-    guild && !listedGuilds.some((g) => g.gid === gid)
-      ? [guild, ...listedGuilds]
-      : listedGuilds;
   const dayRemaining = remaining(members, states, currentDay);
   const visibleMembers = useMemo(
     () =>
@@ -344,7 +347,7 @@ function App() {
               (filter === "none" &&
                 [1, 2].every((s) => !checked(states, m.uid, currentDay, s)))),
         )
-        .sort((a, b) => sort.dir * a.userName.localeCompare(b.userName, "ja")),
+        .sort(memberComparator(sort)),
     [members, memberSearch, filter, states, currentDay, sort],
   );
   const rankedGuilds = useMemo(
@@ -367,6 +370,16 @@ function App() {
   );
   function sortBy(key) {
     setSort((s) => ({ key, dir: s.key === key ? -s.dir : 1 }));
+  }
+  function registerPersonal(g) {
+    setRegisteredGuilds((saved) => saved.some((r) => r.gid === g.gid) ? saved : [...saved, g]);
+    setSelection((s) => ({ ...s, [team]: g.gid }));
+    setRegisterGuild(false); setCheckerTools(false); setView("checker"); setMemberSearch(""); setFilter("all");
+    announce("自分の登録リストに追加しました");
+  }
+  function removePersonal() {
+    setRegisteredGuilds((saved) => saved.filter((g) => g.gid !== gid));
+    setSelection((s) => ({ ally: s.ally === gid ? "" : s.ally, enemy: s.enemy === gid ? "" : s.enemy }));
   }
   function openGuild(g) {
     setSelection((s) => ({ ...s, [team]: g.gid }));
@@ -421,33 +434,10 @@ function App() {
           onChange={(e) => setRankLimit(e.target.value)}
         >
           <option value="100">上位100位</option>
+          <option value="200">上位200位</option>
           <option value="500">上位500位</option>
-          <option value="all">取得できた全ギルド</option>
         </select>
       </label>}
-      {view === "checker" && (
-        <label className="field guild-field">
-          <span>
-            対象ギルド <small>{listedGuilds.length}件</small>
-          </span>
-          <select
-            value={gid}
-            onChange={(e) => {
-              setSelection((s) => ({ ...s, [team]: e.target.value }));
-              setMemberSearch("");
-            }}
-            disabled={guildLoading}
-          >
-            <option value="">ギルドを選択してください</option>
-            {selectedOptions.map((g) => (
-              <option key={g.gid} value={g.gid}>
-                {g.lastGuildWarRank ? `#${g.lastGuildWarRank} ` : ""}
-                {g.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
     </div>
   );
   return (
@@ -578,18 +568,8 @@ function App() {
             </div>
           )}
           {tierResponse?.stale && (view === "ranking" || checkerTools) && <div className="alert warning" role="status">{tierResponse.warning || "階級情報の更新が止まっています。保存済みの階級を表示しています。"}{tier && <button className="text-button" onClick={() => setTier("")}>すべて表示</button>}</div>}
-          {registerGuild && (
-            <GuildRegistration
-              token={token}
-              onClose={() => setRegisterGuild(false)}
-              onSaved={(g) => {
-                setRegisterGuild(false);
-                setSelection((s) => ({ ...s, [team]: g.gid }));
-                setView("checker");
-                setRefresh((n) => n + 1);
-              }}
-            />
-          )}
+          {storageWarning && <div className="alert warning" role="alert">{storageWarning}</div>}
+          {registerGuild && <GuildRegistration guilds={guilds} registeredGuilds={registeredGuilds} loading={guildLoading} error={guildError} onClose={() => setRegisterGuild(false)} onRegister={registerPersonal} />}
           {settings && (
             <section className="help-panel">
               <h2>使い方と保存設定</h2>
@@ -672,14 +652,21 @@ function App() {
                   <button className="button" onClick={share}>共有リンク</button>
                   <button className="button" onClick={() => setSettings((v) => !v)}>使い方・保存設定</button>
                 </div>
-                {controls}
+                <label className="personal-guild-field">自分の登録ギルド
+                  <select aria-label="自分の登録ギルド" disabled={saving} value={personalGuilds.some((g) => g.gid === gid) ? gid : ""} onChange={(e) => { setSelection((s) => ({ ...s, [team]: e.target.value })); setMemberSearch(""); }}>
+                    <option value="">ギルドを選択してください</option>
+                    {personalGuilds.map((g) => <option key={g.gid} value={g.gid}>{g.name}</option>)}
+                  </select>
+                </label>
+                <p className="personal-note">登録と並び順はこのブラウザーに保存。攻撃チェックはギルドで共有します。</p>
+                {personalGuilds.some((g) => g.gid === gid) && <button className="text-button" onClick={removePersonal}>選択中のギルドの登録を解除</button>}
                 <button className="text-button register-in-selection" onClick={() => setRegisterGuild((v) => !v)}>＋ ギルドを登録</button>
               </section>}
               {gid && (
                 <>
                   <div className="checklist-heading">
                     <h1>{guild?.name || "ギルド"} <small>{members.length}人</small></h1>
-                    <span>{currentDay.slice(5).replace("-", "/")} 残り <b>{rosterLoading ? "—" : dayRemaining}</b>回</span>
+                    <span>{!registeredGuilds.some((g) => g.gid === gid) && guild && <button className="text-button" onClick={() => registerPersonal(guild)}>自分に登録</button>}{currentDay.slice(5).replace("-", "/")} 残り <b>{rosterLoading ? "—" : dayRemaining}</b>回</span>
                   </div>
                   {(checkerTools || roster?.needsSetup) && <details
                     className="roster-details"
@@ -769,6 +756,9 @@ function App() {
                   <section className="panel roster-panel">
                     <div className="checklist-tools">
                       <input aria-label="メンバー検索" placeholder="名前で検索" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)} />
+                      <select className="checklist-sort" aria-label="メンバーの並び順" value={`${sort.key}:${sort.dir}`} onChange={(e) => { const [key, dir] = e.target.value.split(":"); setSort(validSort({ key, dir: Number(dir) })); }}>
+                        <option value="name:1">名前 ↑</option><option value="name:-1">名前 ↓</option><option value="level:-1">レベル ↓</option><option value="level:1">レベル ↑</option>
+                      </select>
                       <select aria-label="攻撃状況で絞り込み" value={filter} onChange={(e) => setFilter(e.target.value)}>
                         <option value="all">すべて</option>
                         <option value="remaining">残りあり</option>
@@ -825,7 +815,7 @@ function App() {
                               return (
                                 <tr key={m.uid}>
                                   <th scope="row" className="member-name">
-                                    <strong>{m.userName}</strong>
+                                    <strong>{m.userName}</strong>{sort.key === "level" && <small className="sort-level">Lv.{m.level}</small>}
                                   </th>
                                   {dates.flatMap((d) => [1, 2].map((slot) => (
                                     <td key={`${d}-${slot}`} className={d === currentDay ? "selected-day check-cell" : "check-cell"}>
@@ -862,7 +852,7 @@ function App() {
                   <Icon name="shield" size={36} />
                   <h2>ギルドを選んで始めましょう</h2>
                   <p>
-                    敵チームは、上の対象ギルドから対戦相手を選択してください。
+                    「＋ ギルドを登録」から上位500ギルドを選択できます。登録すると、次回も自分のリストから選べます。
                   </p>
                 </div>
               )}
