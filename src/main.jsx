@@ -523,6 +523,7 @@ function App() {
           </div>
         </header>
         <main>
+          {view === "checker" && <header className="site-title">Guild War Note</header>}
           {location.hostname.endsWith(".chatgpt.site") && <div className="site-migration"><span>新しいURLへ登録・自分用の記録を移せます。</span><button className="button" onClick={() => { try { transferToPublicSite(); } catch (e) { announce(e.message); } }}>新しいサイトへ移動</button></div>}
           <div className="page-heading">
             <div>
