@@ -4,12 +4,7 @@ import {
   checked,
   remaining,
   weekDates,
-  shiftWeek,
   gameDate,
-  leagueLabel,
-  levelLabel,
-  LEAGUES,
-  csvCell,
 } from "../shared/domain.mjs";
 import "./style.css";
 import "./compact.css";
@@ -97,14 +92,6 @@ function loadChoice() {
     return { ally: query.get("gid") || "", enemy: query.get("enemyGid") || "" };
   }
 }
-function initialWeek() {
-  try {
-    return weekDates(query.get("week") || gameDate())[0];
-  } catch {
-    return weekDates()[0];
-  }
-}
-
 function App() {
   const [view, setView] = useState(
     location.pathname === "/guild-tracker" ? "ranking" : "checker",
@@ -121,8 +108,9 @@ function App() {
     [tierResponse, setTierResponse] = useState(null),
     [search, setSearch] = useState(""),
     [rankLimit, setRankLimit] = useState("500");
-  const [week, setWeek] = useState(initialWeek),
-    [today, setToday] = useState(gameDate()),
+  const [today, setToday] = useState(gameDate()),
+    [filterDay, setFilterDay] = useState(""),
+    [checkerTools, setCheckerTools] = useState(false),
     [roster, setRoster] = useState(null),
     [states, setStates] = useState({}),
     [rosterLoading, setRosterLoading] = useState(false),
@@ -131,7 +119,7 @@ function App() {
     [saved, setSaved] = useState("");
   const [memberSearch, setMemberSearch] = useState(""),
     [filter, setFilter] = useState("all"),
-    [sort, setSort] = useState({ key: "pvp", dir: 1 }),
+    [sort, setSort] = useState({ key: "name", dir: 1 }),
     [page, setPage] = useState(1),
     [rankSort, setRankSort] = useState({ key: "lastGuildWarRank", dir: 1 });
   const [editingRoster, setEditingRoster] = useState(false),
@@ -155,8 +143,9 @@ function App() {
     });
     return () => c.abort();
   }, [refresh]);
+  const week = weekDates(today)[0];
   const dates = useMemo(() => weekDates(week), [week]);
-  const currentDay = dates.includes(today) ? today : dates[0];
+  const currentDay = dates.includes(filterDay) ? filterDay : dates.find((d) => d >= today) || dates[2];
   useEffect(() => {
     const t = setInterval(() => setToday(gameDate()), 30000);
     const refreshData = setInterval(() => {
@@ -210,13 +199,12 @@ function App() {
     if (selection.ally) q.set("gid", selection.ally);
     if (selection.enemy) q.set("enemyGid", selection.enemy);
     q.set("team", team);
-    q.set("week", week);
     history.replaceState(
       null,
       "",
       `${view === "ranking" ? "/guild-tracker" : "/guildWarCount"}?${q}`,
     );
-  }, [selection, team, week, view]);
+  }, [selection, team, view]);
   useEffect(() => {
     const seq = ++generation.current;
     const c = new AbortController();
@@ -343,13 +331,7 @@ function App() {
     guild && !listedGuilds.some((g) => g.gid === gid)
       ? [guild, ...listedGuilds]
       : listedGuilds;
-  const done =
-    members.length * 6 -
-    dates.reduce((sum, d) => sum + remaining(members, states, d), 0);
-  const weekRemaining = members.length * 6 - done;
-  const todayRemaining = dates.includes(today)
-    ? remaining(members, states, today)
-    : null;
+  const dayRemaining = remaining(members, states, currentDay);
   const visibleMembers = useMemo(
     () =>
       members
@@ -362,16 +344,7 @@ function App() {
               (filter === "none" &&
                 [1, 2].every((s) => !checked(states, m.uid, currentDay, s)))),
         )
-        .sort((a, b) => {
-          if (sort.key === "name")
-            return sort.dir * a.userName.localeCompare(b.userName, "ja");
-          if (sort.key === "level") return sort.dir * (a.level - b.level);
-          const rank = (p) => {
-            const i = LEAGUES.indexOf(p);
-            return i < 0 ? 999 : i;
-          };
-          return sort.dir * (rank(a.pvpLeaguePhase) - rank(b.pvpLeaguePhase));
-        }),
+        .sort((a, b) => sort.dir * a.userName.localeCompare(b.userName, "ja")),
     [members, memberSearch, filter, states, currentDay, sort],
   );
   const rankedGuilds = useMemo(
@@ -400,34 +373,6 @@ function App() {
     setView("checker");
     setMemberSearch("");
     setFilter("all");
-  }
-  function exportCSV() {
-    const rows = [
-      [
-        "メンバー",
-        "レベル",
-        "PVP",
-        ...dates.flatMap((d) => [`${d} 1回目`, `${d} 2回目`]),
-      ],
-      ...members.map((m) => [
-        m.userName,
-        levelLabel(m.level),
-        leagueLabel(m.pvpLeaguePhase),
-        ...dates.flatMap((d) =>
-          [1, 2].map((s) => (checked(states, m.uid, d, s) ? "済" : "未")),
-        ),
-      ]),
-    ];
-    const blob = new Blob(
-      ["\ufeff" + rows.map((r) => r.map(csvCell).join(",")).join("\r\n")],
-      { type: "text/csv;charset=utf-8" },
-    );
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `guildwar-${team}-${dates[0]}.csv`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   async function share() {
     try {
@@ -632,7 +577,7 @@ function App() {
               <span>公開名簿の取得と、攻撃記録の共有</span>
             </div>
           )}
-          {tierResponse?.stale && <div className="alert warning" role="status">{tierResponse.warning || "階級情報の更新が止まっています。保存済みの階級を表示しています。"}{tier && <button className="text-button" onClick={() => setTier("")}>すべて表示</button>}</div>}
+          {tierResponse?.stale && (view === "ranking" || checkerTools) && <div className="alert warning" role="status">{tierResponse.warning || "階級情報の更新が止まっています。保存済みの階級を表示しています。"}{tier && <button className="text-button" onClick={() => setTier("")}>すべて表示</button>}</div>}
           {registerGuild && (
             <GuildRegistration
               token={token}
@@ -700,7 +645,6 @@ function App() {
           {view === "checker" ? (
             <>
               <div className="team-toolbar">
-                <button className="compact-ranking-link text-button" onClick={() => setView("ranking")}>ランキング</button>
                 <div className="segmented">
                   <button
                     className={team === "ally" ? "selected" : ""}
@@ -719,55 +663,25 @@ function App() {
                     敵チーム
                   </button>
                 </div>
-                <span className="subtle">
-                  味方・敵それぞれのギルドを選べます
-                </span>
+                <button className="checker-options" aria-expanded={checkerTools} aria-controls="checker-options-panel" onClick={() => setCheckerTools((v) => !v)}>設定</button>
               </div>
-              <details
-                className="panel selection-panel guild-selection"
-                key={team}
-                open={!gid}
-              >
-                <summary>ギルドを選択・変更</summary>
+              {(checkerTools || !gid) && <section id="checker-options-panel" className="panel checker-options-panel">
+                <div className="checker-actions">
+                  <button className="button" onClick={() => setView("ranking")}>ランキング</button>
+                  <button className="button" onClick={() => setRefresh((n) => n + 1)} disabled={guildLoading || rosterLoading || saving}>更新</button>
+                  <button className="button" onClick={share}>共有リンク</button>
+                  <button className="button" onClick={() => setSettings((v) => !v)}>使い方・保存設定</button>
+                </div>
                 {controls}
-                <button
-                  className="text-button register-in-selection"
-                  onClick={() => setRegisterGuild((v) => !v)}
-                >
-                  ＋ ギルドを登録
-                </button>
-              </details>
+                <button className="text-button register-in-selection" onClick={() => setRegisterGuild((v) => !v)}>＋ ギルドを登録</button>
+              </section>}
               {gid && (
                 <>
-                  <div className="guild-heading">
-                    <div className="guild-identity">
-                      <div className="guild-emblem">
-                        <Icon name="shield" size={27} />
-                      </div>
-                      <div>
-                        <h2>
-                          {guild?.name || "ギルド"}{" "}
-                          <span className="country-tag">
-                            {flag(guild?.nationalFlag || "")}{" "}
-                            {guild?.nationalFlag}
-                          </span>
-                        </h2>
-                        <p>
-                          {team === "ally" ? "味方チーム" : "敵チーム"}{" "}
-                          <span>·</span> ギルド戦{" "}
-                          {guild?.lastGuildWarRank
-                            ? `#${number(guild.lastGuildWarRank)}`
-                            : "順位未取得"}{" "}
-                          <span>·</span> Lv.{guild?.level || "—"}
-                        </p>
-                      </div>
-                    </div>
-                    <button className="button secondary" onClick={share}>
-                      <Icon name="link" size={16} />
-                      共有リンク
-                    </button>
+                  <div className="checklist-heading">
+                    <h1>{guild?.name || "ギルド"} <small>{members.length}人</small></h1>
+                    <span>{currentDay.slice(5).replace("-", "/")} 残り <b>{rosterLoading ? "—" : dayRemaining}</b>回</span>
                   </div>
-                  <details
+                  {(checkerTools || roster?.needsSetup) && <details
                     className="roster-details"
                     key={gid}
                     open={roster?.needsSetup || undefined}
@@ -822,7 +736,7 @@ function App() {
                         名簿を管理
                       </button>
                     </div>
-                  </details>
+                  </details>}
                   {editingRoster && (
                     <RosterEditor
                       key={gid}
@@ -852,140 +766,18 @@ function App() {
                       }}
                     />
                   )}
-                  <div className="stats">
-                    <Stat
-                      icon="users"
-                      label="メンバー"
-                      value={rosterLoading ? "—" : members.length}
-                      unit="人"
-                      foot={`登録人数 ${guild?.currentMemberCount ?? "—"} / 50`}
-                    />
-                    <Stat
-                      icon="clock"
-                      label="本日の残り攻撃"
-                      value={
-                        rosterLoading
-                          ? "—"
-                          : todayRemaining === null
-                            ? "—"
-                            : todayRemaining
-                      }
-                      unit={todayRemaining === null ? "" : "回"}
-                      foot={
-                        todayRemaining === null
-                          ? "本日は対象の攻撃日ではありません"
-                          : `${today.slice(5).replace("-", "/")} · 日本時間09:00更新`
-                      }
-                      accent="orange"
-                    />
-                    <Stat
-                      icon="check"
-                      label="今週の消化済み"
-                      value={rosterLoading ? "—" : done}
-                      unit="回"
-                      foot={`全 ${members.length * 6} 回中`}
-                      accent="green"
-                    />
-                    <Stat
-                      icon="shield"
-                      label="今週の残り攻撃"
-                      value={rosterLoading ? "—" : weekRemaining}
-                      unit="回"
-                      foot="水・金・日 各2回"
-                    />
-                  </div>
                   <section className="panel roster-panel">
-                    <div className="roster-top">
-                      <div className="week-switch">
-                        <button
-                          aria-label="前の週"
-                          onClick={() => setWeek(shiftWeek(week, -1))}
-                          disabled={saving}
-                        >
-                          ‹
-                        </button>
-                        <strong>
-                          {dates[0].slice(0, 4)}年{" "}
-                          {dates[0].slice(5).replace("-", "/")} —{" "}
-                          {dates[2].slice(5).replace("-", "/")}
-                        </strong>
-                        <button
-                          aria-label="次の週"
-                          onClick={() => setWeek(shiftWeek(week, 1))}
-                          disabled={saving}
-                        >
-                          ›
-                        </button>
-                        <button
-                          className="this-week"
-                          onClick={() => setWeek(weekDates()[0])}
-                          disabled={saving}
-                        >
-                          今週
-                        </button>
-                      </div>
-                      <div className="save-indicator" role="status">
-                        <span className={`dot ${error ? "orange" : "green"}`} />
-                        {saving
-                          ? "保存中…"
-                          : saved
-                            ? `${saved} 保存済み`
-                            : "サーバーに共有保存"}
-                      </div>
+                    <div className="checklist-tools">
+                      <input aria-label="メンバー検索" placeholder="名前で検索" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)} />
+                      <select aria-label="攻撃状況で絞り込み" value={filter} onChange={(e) => setFilter(e.target.value)}>
+                        <option value="all">すべて</option>
+                        <option value="remaining">残りあり</option>
+                        <option value="none">未攻撃</option>
+                      </select>
                     </div>
-                    <div className="table-tools">
-                      <div className="tabs">
-                        {[
-                          ["all", "すべて"],
-                          ["remaining", "残りあり"],
-                          ["none", "未攻撃"],
-                        ].map(([key, label]) => (
-                          <button
-                            key={key}
-                            className={filter === key ? "active" : ""}
-                            onClick={() => setFilter(key)}
-                          >
-                            {label}
-                            {key === "all" && <span>{members.length}</span>}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="member-tools">
-                        <select
-                          className="member-sort"
-                          aria-label="メンバーの並び順"
-                          value={`${sort.key}:${sort.dir}`}
-                          onChange={(e) => {
-                            const [key, dir] = e.target.value.split(":");
-                            setSort({ key, dir: Number(dir) });
-                          }}
-                        >
-                          <option value="name:1">名前 ↑</option>
-                          <option value="name:-1">名前 ↓</option>
-                          <option value="level:-1">レベル ↓</option>
-                          <option value="level:1">レベル ↑</option>
-                          <option value="pvp:1">PVP ↑</option>
-                          <option value="pvp:-1">PVP ↓</option>
-                        </select>
-                        <div className="input-icon">
-                          <Icon name="search" size={16} />
-                          <input
-                            aria-label="メンバー検索"
-                            placeholder="メンバー名で検索"
-                            value={memberSearch}
-                            onChange={(e) => setMemberSearch(e.target.value)}
-                          />
-                        </div>
-                        <button
-                          className="icon-button"
-                          aria-label="CSVダウンロード"
-                          title="CSVダウンロード"
-                          onClick={exportCSV}
-                          disabled={!members.length}
-                        >
-                          <Icon name="download" size={18} />
-                        </button>
-                      </div>
+                    <div className="checklist-caption">
+                      <span>— 未攻撃　／ 1回　× 2回</span>
+                      <span className="save-indicator" role="status">{saving ? "保存中…" : error ? "未保存" : saved ? "保存済み" : "自動保存"}</span>
                     </div>
                     {error && (
                       <div className="alert" role="alert">
@@ -995,10 +787,6 @@ function App() {
                         </button>
                       </div>
                     )}
-                    <div className="attack-legend">
-                      <span>— 未攻撃　／ 1回　× 2回</span>
-                      <span>タップで切替・2回の次は解除</span>
-                    </div>
                     {rosterLoading ? (
                       <div className="loading" role="status">
                         <span className="spinner" />
@@ -1014,7 +802,6 @@ function App() {
                           <colgroup>
                             <col className="member-column" />
                             {dates.map((d) => <col key={d} className="attack-column" />)}
-                            <col className="left-column" />
                           </colgroup>
                           <thead>
                             <tr>
@@ -1022,25 +809,23 @@ function App() {
                                 <button onClick={() => sortBy("name")}>メンバー ↕</button>
                               </th>
                               {dates.map((d, i) => (
-                                <th scope="col" key={d} className={d === today ? "today-col day-heading" : "day-heading"}>
-                                  {d.slice(5).replace("-", "/")}
-                                  <small>{["水", "金", "日"][i]}{d === today ? "・本日" : ""}</small>
+                                <th scope="col" key={d} className={d === currentDay ? "selected-day day-heading" : "day-heading"}>
+                                  <button className="day-filter" aria-pressed={d === currentDay} aria-label={`${d}の攻撃状況で絞り込み`} onClick={() => setFilterDay(d)}>
+                                    {["水", "金", "日"][i]}<small>{d.slice(5).replace("-", "/")}{d === today ? " 本日" : ""}</small>
+                                  </button>
                                 </th>
                               ))}
-                              <th scope="col" className="remaining-col">週残</th>
                             </tr>
                           </thead>
                           <tbody>
                             {visibleMembers.map((m) => {
-                              const left = dates.reduce((sum, d) => sum + remaining([m], states, d), 0);
                               return (
                                 <tr key={m.uid}>
                                   <th scope="row" className="member-name">
                                     <strong>{m.userName}</strong>
-                                    <small>{levelLabel(m.level)}{m.pvpLeaguePhase ? ` · ${leagueLabel(m.pvpLeaguePhase)}` : ""}</small>
                                   </th>
                                   {dates.map((d) => (
-                                    <td key={d} className={d === today ? "today-col check-cell" : "check-cell"}>
+                                    <td key={d} className={d === currentDay ? "selected-day check-cell" : "check-cell"}>
                                       <AttackControl
                                         name={m.userName}
                                         day={d}
@@ -1051,11 +836,6 @@ function App() {
                                       />
                                     </td>
                                   ))}
-                                  <td className="remaining-col">
-                                    <span className={left === 0 ? "count-badge complete" : "count-badge"}>
-                                      {left === 0 ? "済" : left}
-                                    </span>
-                                  </td>
                                 </tr>
                               );
                             })}
@@ -1070,28 +850,8 @@ function App() {
                         )}
                       </div>
                     )}
-                    <div className="table-footer">
-                      <span>
-                        タップ：未攻撃 → 1回 → 2回 → 解除
-                      </span>
-                      <span>
-                        「残りあり」「未攻撃」は
-                        {dates.includes(today)
-                          ? "本日"
-                          : dates[0].slice(5).replace("-", "/")}
-                        分で絞り込み
-                      </span>
-                      <span>
-                        {visibleMembers.length} / {members.length} 人
-                      </span>
-                    </div>
+                    <div className="table-footer"><span>日付を選ぶと、その日の未攻撃で絞り込めます。</span><span>{visibleMembers.length} / {members.length}人</span></div>
                   </section>
-                  <div className="usage-note">
-                    <Icon name="info" size={17} />
-                    <p>
-                      攻撃の自動検知は行いません。ゲーム内の結果を確認してチェックしてください。記録は15秒ごとに同期します。
-                    </p>
-                  </div>
                 </>
               )}
               {!gid && (
@@ -1230,7 +990,7 @@ function App() {
               </section>
             </>
           )}
-          <details className="source-details">
+          {(view === "ranking" || checkerTools) && <details className="source-details">
             <summary>データ取得元・取得日時</summary>
             <p>
               ギルド一覧：
@@ -1259,7 +1019,7 @@ function App() {
             <p>
               ゲーム情報が最新とは限りません。ギルド一覧の取得が停止しても、保存済み・手動登録のギルドと名簿で攻撃チェックを継続できます。
             </p>
-          </details>
+          </details>}
           <footer>
             <span>
               LINE RANGERS <b>GUILD WAR</b>
@@ -1283,21 +1043,6 @@ function App() {
           {notice}
         </div>
       )}
-    </div>
-  );
-}
-function Stat({ icon, label, value, unit, foot, accent = "" }) {
-  return (
-    <div className={`stat ${accent}`} title={foot}>
-      <div className="stat-header">
-        <span>{label}</span>
-        <Icon name={icon} size={19} />
-      </div>
-      <div className="stat-value">
-        {value}
-        <span>{unit}</span>
-      </div>
-      <div className="stat-foot">{foot}</div>
     </div>
   );
 }

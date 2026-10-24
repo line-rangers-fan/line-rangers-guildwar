@@ -1,340 +1,76 @@
-/* The checklist keeps all three attack days beside the member name at any width. */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+/* One checklist surface, with secondary tools behind Settings. */
+.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.compact-checker .sidebar, .compact-checker .topbar,
+.compact-checker .page-heading, .compact-checker footer { display:none; }
+.compact-checker .workspace { margin:0; width:100%; }
+.compact-checker main { width:100%; max-width:860px; padding:12px 14px 20px; }
+.compact-checker .team-toolbar { display:flex; gap:8px; margin:0 0 8px; }
+.compact-checker .segmented { flex:1; display:flex; padding:2px; }
+.compact-checker .segmented button { flex:1; min-height:32px; padding:5px 10px; font-size:12px; }
+.checker-options { min-height:36px; padding:5px 12px; background:#fff; border:1px solid var(--border); border-radius:6px; font-size:12px; }
+.checker-options[aria-expanded="true"] { border-color:#4a8057; color:#225836; background:#e9f3e6; }
+.checker-options-panel { padding:12px; margin-bottom:8px; }
+.checker-actions { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+.checker-actions .button { padding:6px 9px; min-height:32px; font-size:11px; }
+.checker-options-panel .register-in-selection { margin:8px 0 0; }
+.checklist-heading { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:2px 0 8px; }
+.checklist-heading h1 { margin:0; font-size:17px; line-height:1.3; overflow-wrap:anywhere; }
+.checklist-heading h1 small { font-weight:400; font-size:11px; color:#73836e; white-space:nowrap; }
+.checklist-heading > span { font-size:11px; color:#657c60; white-space:nowrap; }
+.checklist-heading b { font-size:16px; color:#356343; }
+.roster-details { background:#edf2e5; border-radius:6px; margin-bottom:8px; }
+.roster-details > summary { cursor:pointer; font-size:11px; padding:8px; }
+.roster-warning { color:#9c6c21; margin-left:6px; }
+.compact-checker .roster-status { margin:0; padding:8px; }
+.compact-checker .roster-panel { border-radius:7px; overflow:visible; }
+.checklist-tools { display:flex; gap:8px; align-items:center; padding:8px 10px 4px; }
+.checklist-tools input { flex:1; width:0; min-height:34px; padding:6px 9px; font-size:12px; }
+.checklist-tools select { width:105px; min-height:34px; padding:6px 9px; font-size:12px; }
+.checklist-caption { display:flex; justify-content:space-between; align-items:center; gap:6px; padding:4px 10px 7px; color:#7a8972; font-size:10px; }
+.checklist-caption .save-indicator { font-size:10px; margin:0; }
+.compact-checker .table-scroll { overflow:visible; }
+.compact-checker .compact-member-table { width:100%; min-width:0; table-layout:fixed; white-space:normal; }
+.compact-member-table .attack-column { width:88px; }
+.compact-member-table thead { position:sticky; top:0; z-index:4; }
+.compact-checker .compact-member-table thead th { background:#f6f9f2; text-align:center; font-size:12px; padding:0; border-bottom:1px solid var(--border); }
+.compact-checker .compact-member-table thead th:first-child { text-align:left; padding-left:10px; }
+.day-filter { width:100%; min-height:40px; background:none; border:0; padding:4px 0; color:#67845d; font-weight:600; line-height:1.1; }
+.day-filter small { display:block; margin-top:3px; font-size:10px; font-weight:400; }
+.day-filter[aria-pressed="true"] { color:#245a38; box-shadow:inset 0 -2px #4a8455; }
+.compact-checker .compact-member-table th.selected-day, .compact-checker .compact-member-table td.selected-day { background:#f0f7e9; }
+.compact-checker .compact-member-table tbody .member-name { background:#fff; border-bottom:1px solid #edf1e7; padding:3px 10px; text-align:left; color:#304537; font-size:13px; line-height:1.2; overflow-wrap:anywhere; }
+.member-name strong { font-weight:550; }
+.compact-checker .compact-member-table .check-cell { padding:2px; height:36px; width:auto; border-bottom:1px solid #edf1e7; }
+/* Cancel the older table's sticky second column. */
+.compact-checker .compact-member-table thead tr:first-child th:nth-child(2),
+.compact-checker .compact-member-table tbody td:nth-child(2) { position:static; box-shadow:none; }
+.attack-mark { display:inline-grid; place-items:center; position:relative; width:62px; height:32px; padding:0; border:1px solid #dce6d6; background:#fff; border-radius:4px; color:#315f3f; vertical-align:middle; }
+.attack-mark[data-count="1"] { background:#fff4d9; border-color:#e3c67a; color:#906c14; }
+.attack-mark[data-count="2"] { background:#dcedd5; border-color:#b4d4a5; }
+.attack-strokes { position:relative; width:22px; height:22px; }
+.attack-strokes::before, .attack-strokes::after { content:""; position:absolute; top:10px; left:0; width:22px; height:2px; border-radius:1px; background:currentColor; }
+.attack-mark[data-count="0"] .attack-strokes::before { width:9px; left:6px; background:#bcc8b5; }
+.attack-mark[data-count="1"] .attack-strokes::before, .attack-mark[data-count="2"] .attack-strokes::before { transform:rotate(-43deg); }
+.attack-mark[data-count="2"] .attack-strokes::after { transform:rotate(43deg); }
+.attack-mark:not([data-count="2"]) .attack-strokes::after { display:none; }
+.attack-mark:focus-visible { outline:3px solid #80ad70; outline-offset:1px; }
+.compact-checker .table-footer { display:flex; justify-content:space-between; gap:8px; padding:7px 10px; font-size:10px; color:#83917c; }
+@media (max-width:600px) {
+ .compact-checker main { padding:5px 5px 14px; }
+ .compact-checker .team-toolbar { margin-bottom:4px; gap:5px; }
+ .checklist-heading { padding-bottom:5px; }
+ .checklist-heading h1 { font-size:15px; }
+ .checklist-heading > span { font-size:10px; }
+ .checklist-heading b { font-size:14px; }
+ .checklist-tools { gap:6px; padding:5px 6px 2px; }
+ .checklist-tools input, .checklist-tools select { min-height:32px; font-size:11px; }
+ .checklist-tools select { width:95px; }
+ .checklist-caption { padding:3px 6px 5px; font-size:10px; }
+ .compact-member-table .attack-column { width:53px; }
+ .compact-checker .compact-member-table tbody .member-name { font-size:12px; padding:2px 5px; }
+ .compact-checker .compact-member-table thead th:first-child { padding-left:5px; }
+ .compact-checker .compact-member-table .check-cell { height:32px; padding:1px; }
+ .attack-mark { width:calc(100% - 4px); max-width:47px; height:30px; }
+ .compact-checker .table-footer { padding:5px; font-size:9px; }
 }
-.compact-checker main { padding-top: 16px; }
-.compact-checker .page-heading { margin-bottom: 8px; }
-.compact-checker .eyebrow,
-.compact-checker .page-heading p { display: none; }
-.compact-checker h1 { font-size: 22px; margin: 0; }
-.compact-checker .refresh { margin-top: 0; }
-.compact-checker .registration-toolbar { margin: 0 0 6px; }
-.compact-checker .team-toolbar { margin-bottom: 6px; }
-.compact-checker .segmented button { padding: 6px 12px; }
-.compact-checker .guild-selection { padding: 0; }
-.guild-selection > summary,
-.roster-details > summary {
-  cursor: pointer;
-  padding: 8px 11px;
-  color: #59734e;
-  font-size: 11px;
-  min-height: 32px;
-}
-.guild-selection > .controls { padding: 7px 12px 12px; }
-.register-in-selection { margin: 0 12px 9px; font-size: 11px; }
-.compact-checker .guild-heading { margin: 9px 0 5px; }
-.compact-checker .guild-emblem { width: 32px; height: 34px; }
-.compact-checker .guild-emblem svg { width: 21px; }
-.compact-checker .guild-identity h2 { font-size: 17px; margin-bottom: 2px; }
-.compact-checker .guild-identity p { font-size: 9px; }
-.roster-details { margin-bottom: 6px; border-radius: 6px; background: #edf2e5; }
-.compact-checker .roster-status { margin: 0; padding: 6px 12px 10px; }
-.roster-warning { color: #986e2e; margin-left: 8px; font-weight: 700; }
-.compact-checker .stats {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-.compact-checker .stat {
-  padding: 8px 6px;
-  border: 0;
-  border-right: 1px solid var(--border);
-  border-radius: 0;
-  text-align: center;
-}
-.compact-checker .stat:last-child { border-right: 0; }
-.compact-checker .stat-header { justify-content: center; font-size: 10px; }
-.compact-checker .stat-header svg,
-.compact-checker .stat-foot { display: none; }
-.compact-checker .stat-value { font-size: 25px; margin: 5px 0 0; }
-.compact-checker .stat-value > span { font-size: 9px; margin-left: 3px; }
-.compact-checker .roster-panel,
-.compact-checker .table-scroll { overflow: visible; }
-.compact-checker .roster-top { padding: 7px 10px; gap: 6px; }
-.compact-checker .week-switch { gap: 8px; }
-.compact-checker .week-switch strong { font-size: 10px; }
-.compact-checker .table-tools { padding: 6px 9px; gap: 6px; }
-.compact-checker .tabs { gap: 1px; }
-.compact-checker .tabs button { padding: 6px; min-height: 30px; }
-.compact-checker .tabs button > span { margin-left: 3px; }
-.compact-checker .member-tools { gap: 5px; min-width: 0; }
-.compact-checker .member-tools .input-icon { min-width: 0; }
-.compact-checker .member-tools input { min-width: 0; }
-.member-sort { max-width: 90px; min-height: 32px; font-size: 10px; padding: 4px; }
-.attack-legend {
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 3px 8px;
-  padding: 2px 9px 6px;
-  font-size: 10px;
-  color: #708368;
-}
-.compact-checker .compact-member-table { table-layout: fixed; width: 100%; min-width: 0; white-space: normal; }
-.compact-member-table .attack-column { width: 76px; }
-.compact-member-table .left-column { width: 42px; }
-.compact-member-table thead { position: sticky; top: 0; z-index: 4; }
-.compact-checker .compact-member-table thead th {
-  padding: 6px 2px;
-  text-align: center;
-  font-size: 11px;
-  border-bottom: 1px solid var(--border);
-  min-width: 0;
-}
-.compact-checker .compact-member-table thead th:first-child { text-align: left; padding-left: 10px; }
-.compact-member-table .day-heading small { display: block; font-size: 9px; color: #759066; }
-.compact-checker .compact-member-table tbody .member-name {
-  background: white;
-  border-bottom: 1px solid #edf1e7;
-  padding: 3px 7px 3px 10px;
-  font-size: 12px;
-  color: #304537;
-  overflow-wrap: anywhere;
-  font-weight: 400;
-  line-height: 1.25;
-}
-.member-name strong { font-weight: 550; }
-.member-name small { color: #87967c; font-size: 9px; margin-left: 6px; white-space: nowrap; }
-.compact-checker .compact-member-table .check-cell { padding: 2px; height: 36px; width: auto; }
-.compact-checker .compact-member-table .remaining-col { padding: 2px; min-width: 0; }
-.compact-checker .compact-member-table .count-badge { padding: 3px 4px; font-size: 10px; }
-.attack-mark {
-  display: inline-grid;
-  place-items: center;
-  position: relative;
-  width: 52px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid #dbe4d2;
-  background: white;
-  border-radius: 4px;
-  vertical-align: middle;
-  color: #47763c;
-}
-.attack-mark[data-count="1"] { background: #f0f6e9; }
-.attack-mark[data-count="2"] { background: #e0edd6; border-color: #c6d9b7; }
-.attack-strokes { position: relative; width: 22px; height: 22px; }
-.attack-strokes::before,
-.attack-strokes::after {
-  content: "";
-  position: absolute;
-  top: 10px;
-  left: 0;
-  width: 22px;
-  height: 2px;
-  border-radius: 1px;
-  background: currentColor;
-}
-.attack-mark[data-count="0"] .attack-strokes::before { width: 9px; left: 6px; background: #b8c6ac; }
-.attack-mark[data-count="1"] .attack-strokes::before,
-.attack-mark[data-count="2"] .attack-strokes::before { transform: rotate(-43deg); }
-.attack-mark[data-count="2"] .attack-strokes::after { transform: rotate(43deg); }
-.attack-mark:not([data-count="2"]) .attack-strokes::after { display: none; }
-.attack-mark:focus-visible { outline: 3px solid #80ad70; outline-offset: 1px; }
-.compact-checker .table-footer { padding: 8px 9px; flex-wrap: wrap; }
-.compact-checker .usage-note { margin-top: 8px; margin-bottom: 10px; }
-@media (max-width: 600px) {
-  .compact-checker .sidebar { padding: 5px 10px; }
-  .compact-checker .brand-mark { width: 26px; height: 29px; }
-  .compact-checker .brand > span:not(.brand-mark) { font-size: 9px; }
-  .compact-checker .brand small { font-size: 7px; }
-  .compact-checker .nav { padding: 6px; min-height: 29px; }
-  .compact-checker .topbar { height: 29px; padding: 0 10px; }
-  .compact-checker main { padding: 8px 8px 0; }
-  .compact-checker .page-heading { align-items: center; margin-bottom: 3px; }
-  .compact-checker h1 { font-size: 17px; }
-  .compact-checker .button { min-height: 30px; padding: 5px 7px; }
-  .compact-checker .registration-toolbar { margin-bottom: 3px; }
-  .compact-checker .registration-toolbar button { font-size: 10px; padding: 3px 0; }
-  .compact-checker .team-toolbar { margin-bottom: 4px; }
-  .compact-checker .segmented { padding: 2px; }
-  .compact-checker .segmented button { min-height: 28px; padding: 5px 10px; }
-  .guild-selection > summary,
-  .roster-details > summary { padding: 6px 9px; min-height: 30px; font-size: 10px; }
-  .compact-checker .guild-heading { margin: 6px 0 4px; gap: 5px; }
-  .compact-checker .guild-emblem { display: none; }
-  .compact-checker .guild-identity { gap: 0; }
-  .compact-checker .guild-identity h2 { font-size: 15px; }
-  .compact-checker .guild-heading > .button { font-size: 9px; }
-  .compact-checker .stat { padding: 6px 1px; }
-  .compact-checker .stat-header { font-size: 9px; }
-  .compact-checker .stat-value { font-size: 22px; margin-top: 4px; }
-  .compact-checker .roster-top { padding: 5px 6px; row-gap: 3px; }
-  .compact-checker .week-switch { gap: 4px; }
-  .compact-checker .week-switch strong { font-size: 9px; }
-  .compact-checker .save-indicator { font-size: 8px; }
-  .compact-checker .table-tools { flex-direction: row; flex-wrap: wrap; padding: 4px 6px; gap: 3px; }
-  .compact-checker .tabs { flex: 1; }
-  .compact-checker .tabs button { padding: 4px 7px; font-size: 10px; }
-  .compact-checker .member-tools { width: 100%; }
-  .compact-checker .member-tools .input-icon { flex: 1; }
-  .compact-checker .member-tools input { font-size: 10px; min-height: 30px; }
-  .member-sort { width: 73px; min-height: 30px; padding: 4px 2px; font-size: 10px; }
-  .attack-legend { font-size: 9px; padding: 2px 6px 5px; }
-  .compact-member-table .attack-column { width: 50px; }
-  .compact-member-table .left-column { width: 27px; }
-  .compact-checker .compact-member-table thead th { font-size: 10px; padding: 5px 1px; }
-  .compact-checker .compact-member-table thead th:first-child { padding-left: 6px; }
-  .compact-checker .compact-member-table tbody .member-name { padding: 3px 3px 3px 6px; font-size: 11px; }
-  .member-name small { display: block; font-size: 8px; margin: 1px 0 0; }
-  .compact-checker .compact-member-table .check-cell { height: 36px; }
-  .attack-mark { width: 44px; height: 32px; }
-  /* Override the former horizontal-scroll table's sticky second column. */
-  .compact-checker .compact-member-table thead tr:first-child th:nth-child(2),
-  .compact-checker .compact-member-table tbody td:nth-child(2) { position: static; box-shadow: none; }
-  .compact-checker .compact-member-table thead tr:first-child th.today-col,
-  .compact-checker .compact-member-table tbody td.today-col { background: #f0f6e9; }
-}
-@media (max-width: 350px) {
-  .compact-member-table .attack-column { width: 47px; }
-  .compact-member-table .left-column { width: 24px; }
-  .compact-checker .stat-header { font-size: 8px; }
-}
-
-
-/* Mobile-first attack dashboard: reserve the first viewport for the checklist.
-   Visual-only overrides; do not alter check state, storage or API behavior. */
-@media (max-width: 600px) {
-  .compact-checker .sidebar { padding-block: 3px; }
-  .compact-checker .topbar { height: 24px; }
-  .compact-checker main { padding: 4px 6px 0; }
-  .compact-checker .page-heading { margin-bottom: 2px; }
-  .compact-checker h1 { font-size: 15px; line-height: 1.15; }
-  .compact-checker .registration-toolbar { margin-bottom: 2px; }
-  .compact-checker .team-toolbar { margin-bottom: 2px; }
-  .compact-checker .segmented button { min-height: 27px; }
-  .compact-checker .guild-heading { margin: 3px 0; }
-  .compact-checker .guild-identity h2 { font-size: 13px; line-height: 1.2; }
-  .compact-checker .stats { margin-bottom: 4px; }
-  .compact-checker .stat { padding: 4px 1px; }
-  .compact-checker .stat-value { font-size: 19px; margin-top: 2px; }
-  .compact-checker .roster-top { padding: 3px 5px; }
-  .compact-checker .table-tools { padding: 3px 5px; }
-  .compact-checker .tabs button { min-height: 26px; padding: 3px 5px; }
-  .compact-checker .member-tools input { min-height: 28px; }
-  .compact-checker .member-sort { min-height: 28px; }
-  .compact-checker .attack-legend { padding: 1px 5px 3px; }
-  .compact-checker .compact-member-table thead th { padding: 3px 1px; }
-  .compact-checker .compact-member-table tbody .member-name {
-    padding: 2px 3px 2px 5px; font-size: 11px; line-height: 1.15;
-  }
-  .compact-checker .compact-member-table .check-cell { height: 32px; padding: 1px; }
-  .compact-checker .attack-mark { width: min(44px, 100%); height: 30px; min-height: 30px; }
-  .compact-checker .compact-member-table .remaining-col { padding: 1px; }
-  .compact-checker .table-footer { padding: 4px 6px; }
-  .compact-checker .usage-note { margin: 4px 0; }
-}
-@media (max-width: 380px) {
-  .compact-checker .compact-member-table .attack-column { width: 46px; }
-  .compact-checker .compact-member-table .left-column { width: 24px; }
-  .compact-checker .attack-mark { width: min(40px, 100%); }
-}
-
-
-/* Ultra-compact phone checklist: keep three attack days and names visible. */
-@media (max-width: 600px) {
- .compact-checker .sidebar { padding: 2px 6px; min-height: 26px; }
- .compact-checker .brand-mark { width: 22px; height: 22px; }
- .compact-checker .brand > span:not(.brand-mark) { font-size: 8px; }
- .compact-checker .brand small { display: none; }
- .compact-checker .nav { min-height: 24px; width: 26px; padding: 3px; }
- .compact-checker .topbar { height: 20px; padding: 0 6px; }
- .compact-checker main { padding: 2px 4px 0; }
- .compact-checker .page-heading { margin-bottom: 1px; }
- .compact-checker h1 { font-size: 13px; margin: 0; }
- .compact-checker .page-heading .button { min-height: 24px; padding: 2px 5px; }
- .compact-checker .registration-toolbar { margin: 0; }
- .compact-checker .registration-toolbar button { font-size: 9px; padding: 1px 0; }
- .compact-checker .team-toolbar { margin: 1px 0; }
- .compact-checker .segmented { padding: 1px; }
- .compact-checker .segmented button { min-height: 24px; padding: 3px 7px; font-size: 10px; }
- .compact-checker .guild-heading { margin: 2px 0; }
- .compact-checker .guild-identity h2 { font-size: 12px; margin: 0; }
- .compact-checker .guild-identity p { display: none; }
- .compact-checker .guild-heading > .button { min-height: 24px; padding: 2px 4px; }
- .compact-checker .guild-selection > summary,
- .compact-checker .roster-details > summary { min-height: 23px; padding: 3px 6px; }
- .compact-checker .roster-details { margin-bottom: 2px; }
- .compact-checker .stats { margin-bottom: 2px; border-radius: 4px; }
- .compact-checker .stat { padding: 2px 0; }
- .compact-checker .stat-header { font-size: 8px; }
- .compact-checker .stat-value { font-size: 17px; margin: 1px 0 0; }
- .compact-checker .roster-top { padding: 2px 4px; gap: 2px; }
- .compact-checker .week-switch { gap: 3px; }
- .compact-checker .week-switch > button { height: 23px; }
- .compact-checker .table-tools { padding: 2px 4px; gap: 2px; }
- .compact-checker .tabs button { min-height: 24px; padding: 2px 4px; font-size: 9px; }
- .compact-checker .member-tools input,
- .compact-checker .member-sort { min-height: 25px; height: 25px; }
- .compact-checker .attack-legend { padding: 1px 4px 2px; font-size: 8px; }
- .compact-checker .compact-member-table thead th { padding: 2px 1px; font-size: 9px; }
- .compact-checker .compact-member-table .day-heading small { font-size: 8px; }
- .compact-checker .compact-member-table tbody .member-name { padding: 1px 2px 1px 4px; font-size: 10px; line-height: 1.1; }
- .compact-checker .compact-member-table .check-cell { height: 29px; padding: 1px; }
- .compact-checker .attack-mark { height: 27px; min-height: 27px; border-radius: 3px; }
- .compact-checker .attack-strokes { transform: scale(.85); }
- .compact-checker .compact-member-table .count-badge { padding: 2px; font-size: 9px; }
- .compact-checker .table-footer { padding: 2px 4px; }
- .compact-checker .usage-note { margin: 2px 0; }
-}
-
-
-/* Dense roster mode: remove nonessential chrome, retain accessible attack targets. */
-@media (max-width: 600px) {
- .compact-checker .sidebar, .compact-checker .topbar,
- .compact-checker .page-heading, .compact-checker .registration-toolbar,
- .compact-checker .guild-selection, .compact-checker .roster-details,
- .compact-checker .guild-identity p, .compact-checker .attack-legend,
- .compact-checker .usage-note { display: none; }
- .compact-checker main { padding: 0 3px; }
- .compact-checker .team-toolbar { margin: 0 0 2px; }
- .compact-checker .segmented { width: 100%; justify-content: center; }
- .compact-checker .segmented button { flex: 1; }
- .compact-checker .guild-heading { margin: 1px 0; }
- .compact-checker .guild-heading > .button { min-height: 22px; }
- .compact-checker .stats { margin-bottom: 1px; }
- .compact-checker .stat { padding: 1px 0; }
- .compact-checker .stat-value { font-size: 15px; }
- .compact-checker .roster-top { padding: 1px 3px; }
- .compact-checker .table-tools { padding: 1px 3px; }
- .compact-checker .member-tools { gap: 2px; }
- .compact-checker .tabs button { padding: 2px 3px; }
- .compact-checker .compact-member-table tbody .member-name small { display: none; }
- .compact-checker .compact-member-table tbody .member-name { font-size: 10px; padding: 1px 2px; }
- .compact-checker .compact-member-table .check-cell { height: 30px; }
- .compact-checker .attack-mark { height: 28px; min-height: 28px; }
- .compact-checker .compact-member-table thead th { padding: 2px 0; }
- .compact-checker .table-footer { padding: 1px 3px; }
-}
-
-
-/* Name-first attack roster: no avatars, level or league metadata. */
-.compact-checker .player-avatar,
-.compact-checker .member-name small,
-.compact-checker .player .level,
-.compact-checker .player .league,
-.compact-checker .member-table .row-number { display: none !important; }
-.compact-checker .player { gap: 0; min-width: 0; max-width: none; }
-.compact-checker .member-name { text-align: left; }
-.compact-checker .compact-member-table thead th:first-child,
-.compact-checker .compact-member-table tbody .member-name { padding-left: 3px !important; }
-@media (max-width: 600px) {
- .compact-checker .compact-member-table tbody .member-name { padding-left: 2px !important; }
- .compact-checker .compact-member-table thead th:first-child { padding-left: 2px !important; }
-}
-
-/* Keep guild switching and roster management reachable in dense mobile mode. */
-.compact-ranking-link { display: none; }
-@media (max-width: 600px) {
- .compact-checker .guild-selection, .compact-checker .roster-details { display: block; margin: 2px 0; }
- .compact-checker .guild-selection:not([open]), .compact-checker .roster-details:not([open]) { padding: 0 5px; }
- .compact-checker .compact-ranking-link { display: inline-flex; white-space: nowrap; font-size: 10px; padding: 3px; }
-}
+@media (max-width:350px) { .compact-member-table .attack-column { width:48px; } }
