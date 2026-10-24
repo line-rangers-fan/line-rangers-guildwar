@@ -118,11 +118,10 @@ function App() {
     [states, setStates] = useState({}),
     [rosterLoading, setRosterLoading] = useState(false),
     [error, setError] = useState(""),
-    [saving, setSaving] = useState(false),
-    [saved, setSaved] = useState("");
+    [saving, setSaving] = useState(false);
   const [memberSearch, setMemberSearch] = useState(""),
     [filter, setFilter] = useState(initialPersonal.filter),
-    [sort, setSort] = useState(initialPersonal.sort),
+    [sort, setSort] = useState(() => initialPersonal.sort.key === "level" ? { key: "level", dir: -1 } : { key: "name", dir: 1 }),
     [page, setPage] = useState(1),
     [rankSort, setRankSort] = useState({ key: "lastGuildWarRank", dir: 1 });
   const [editingRoster, setEditingRoster] = useState(false),
@@ -207,7 +206,6 @@ function App() {
     const c = new AbortController();
     setStates({});
     setError("");
-    setSaved("");
     setRoster(null);
     setEditingRoster(false);
     if (!gid) { setRosterLoading(false); return () => c.abort(); }
@@ -274,7 +272,6 @@ function App() {
     busy.current = true;
     setSaving(true);
     setError("");
-    setSaved("");
     const previousStates = states;
     const nextDay = { ...states[uid]?.[day], [slot]: value };
     if (slot === 2 && value) nextDay[1] = true;
@@ -284,7 +281,6 @@ function App() {
     try {
       if (!sharing) {
         savePrivateBoard(localStorage, gid, week, nextStates);
-        setSaved("自分用に保存");
         return;
       }
       const r = await api(`/api/guilds/${gid}/checks`, {
@@ -297,13 +293,6 @@ function App() {
       });
       if (seq === generation.current) {
         setStates(r.states);
-        setSaved(
-          new Date().toLocaleTimeString("ja-JP", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          }),
-        );
       }
     } catch (e) {
       if (seq === generation.current) {
@@ -370,9 +359,6 @@ function App() {
       }),
     [listedGuilds, rankSort],
   );
-  function sortBy(key) {
-    setSort((s) => ({ key, dir: s.key === key ? -s.dir : 1 }));
-  }
   function registerPersonal(g) {
     setSharing(false); setShareFallback("");
     setRegisteredGuilds((saved) => saved.some((r) => r.gid === g.gid) ? saved : [...saved, g]);
@@ -597,6 +583,8 @@ function App() {
                   <button className="button" onClick={() => setView("ranking")}>ランキング</button>
                   <button className="button" onClick={() => setRefresh((n) => n + 1)} disabled={guildLoading || rosterLoading || saving}>更新</button>
                   <button className="button" onClick={share} disabled={!gid || saving || rosterLoading}>{sharing ? "共有リンクをコピー" : "共有リンクを作成"}</button>
+                  {roster?.stale && members.length > 0 && <button className="button" onClick={() => setEditingRoster(true)}>名簿を管理</button>}
+                  {sharing && <button className="button" onClick={() => { setSharing(false); setShareFallback(""); if (personalSelection.current.ally) setSelection(personalSelection.current); }}>自分用へ戻る</button>}
                 </div>
                 <label className="personal-guild-field">自分の登録ギルド
                   <select aria-label="自分の登録ギルド" disabled={saving} value={personalGuilds.some((g) => g.gid === gid) ? gid : ""} onChange={(e) => { setSharing(false); setShareFallback(""); setSelection((s) => ({ ...s, [team]: e.target.value })); setMemberSearch(""); }}>
@@ -604,11 +592,6 @@ function App() {
                     {personalGuilds.map((g) => <option key={g.gid} value={g.gid}>{g.name}</option>)}
                   </select>
                 </label>
-                <div className={`board-mode ${sharing ? "is-shared" : "is-private"}`} data-mode={sharing ? "shared" : "private"}>
-                  <strong>{sharing ? "共有中" : "自分用"}</strong>
-                  <span>{sharing ? "同じリンクで共有・期限なし" : "チェックはこのブラウザーだけに保存"}</span>
-                  {sharing && <button className="text-button" onClick={() => { setSharing(false); setShareFallback(""); if (personalSelection.current.ally) setSelection(personalSelection.current); }}>自分用へ戻る</button>}
-                </div>
                 {sharing && <p className="personal-note">このリンクを知っている人がチェックを編集できます。</p>}
                 {shareFallback && <label className="share-url-field">LINEに貼り付ける共有URL<input aria-label="共有URL" readOnly value={shareFallback} onFocus={(e) => e.target.select()} /></label>}
                 <div className="personal-list-actions">
@@ -622,62 +605,7 @@ function App() {
                     <h1>{guild?.name || "ギルド"} <small>{members.length}人</small></h1>
                     <span>{!registeredGuilds.some((g) => g.gid === gid) && guild && <button className="text-button" onClick={() => registerPersonal(guild)}>自分に登録</button>}{currentDay.slice(5).replace("-", "/")} 残り <b>{rosterLoading ? "—" : dayRemaining}</b>回</span>
                   </div>
-                  <details
-                    className="roster-details"
-                    key={gid}
-                    open={roster?.needsSetup || undefined}
-                  >
-                    <summary>
-                      名簿の情報・管理
-                      {roster?.warning && <span className="roster-warning">要確認</span>}
-                    </summary>
-                    <div className="roster-status">
-                      <p>
-                        {roster?.mode === "snapshot"
-                          ? `閉鎖前に取得した保存名簿です（取得：${dateText(roster.fetchedAt)} JST）。入退会・改名は手動で反映してください。`
-                          : roster?.mode === "manual"
-                            ? "このサイトで管理している名簿です。ゲーム内での変更は「名簿を管理」から反映してください。"
-                            : roster?.needsSetup
-                              ? "公開名簿を取得できませんでした。「名簿を管理」から登録して利用できます。"
-                              : roster?.mode === "rangerbook"
-                                ? `Rangerbookの公開名簿（データ更新：${dateText(roster.fetchedAt)} JST）。表示名で照合します。改名・同名者は「名簿を管理」で確認してください。`
-                              : roster?.mode === "provider"
-                                ? "設定した独立した取得元から更新しています。"
-                                : ""}
-                      </p>
-                      {roster?.warning && !roster?.stale && <p role="status">{roster.warning}</p>}
-                      <button
-                        className="button secondary"
-                        disabled={rosterLoading || saving || editingRoster}
-                        onClick={async () => {
-                          const seq = generation.current;
-                          setRosterLoading(true);
-                          try {
-                            const result = await api(`/api/guilds/${gid}/sync`, {
-                              method: "POST",
-                              headers: token ? { authorization: `Bearer ${token}` } : {},
-                            });
-                            if (seq !== generation.current) return;
-                            setRoster(result);
-                            announce(result.stale ? "取得できないため、保存名簿を維持しました" : "公開名簿を反映しました");
-                          } catch (e) {
-                            if (seq === generation.current) setError(e.message);
-                          } finally {
-                            if (seq === generation.current) setRosterLoading(false);
-                          }
-                        }}
-                      >
-                        {rosterLoading ? "取得中…" : "公開名簿を取得"}
-                      </button>
-                      <button
-                        className="button secondary"
-                        disabled={rosterLoading || saving}
-                        onClick={() => setEditingRoster((v) => !v)}
-                      >
-                        名簿を管理
-                      </button>
-                    </div>
-                  </details>
+                  {!rosterLoading && roster && members.length === 0 && <button className="button" onClick={() => setEditingRoster(true)}>メンバーを登録</button>}
                   {editingRoster && (
                     <RosterEditor
                       key={gid}
@@ -710,18 +638,14 @@ function App() {
                   <section className="panel roster-panel">
                     <div className="checklist-tools">
                       <input aria-label="メンバー検索" placeholder="名前で検索" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)} />
-                      <select className="checklist-sort" aria-label="メンバーの並び順" value={`${sort.key}:${sort.dir}`} onChange={(e) => { const [key, dir] = e.target.value.split(":"); setSort(validSort({ key, dir: Number(dir) })); }}>
-                        <option value="name:1">名前 ↑</option><option value="name:-1">名前 ↓</option><option value="level:-1">レベル ↓</option><option value="level:1">レベル ↑</option>
+                      <select className="checklist-sort" aria-label="メンバーの並び順" value={sort.key} onChange={(e) => setSort(validSort({ key: e.target.value, dir: e.target.value === "level" ? -1 : 1 }))}>
+                        <option value="name">名前</option><option value="level">レベル</option>
                       </select>
                       <select aria-label="攻撃状況の表示順" value={filter} onChange={(e) => setFilter(e.target.value)}>
                         <option value="all">すべて</option>
                         <option value="attacked">攻撃済み</option>
                         <option value="none">未攻撃</option>
                       </select>
-                    </div>
-                    <div className="checklist-caption">
-                      <span><b className="ordering-day">対象：{dayLabel}</b>　チェック＝攻撃済み</span>
-                      <span className="save-indicator" role="status">{saving ? "保存中…" : error ? "未保存" : saved ? "保存済み" : sharing ? "共有に自動保存" : "自分用に自動保存"}</span>
                     </div>
                     {error && (
                       <div className="alert" role="alert">
@@ -750,7 +674,7 @@ function App() {
                           <thead>
                             <tr>
                               <th scope="col" rowSpan={2}>
-                                <button onClick={() => sortBy("name")}>名前 ↕</button>
+                                名前
                               </th>
                               {dates.map((d, i) => (
                                 <th scope="colgroup" colSpan={2} key={d} className={d === currentDay ? "selected-day day-heading" : "day-heading"}>
