@@ -23,9 +23,10 @@
 .roster-warning { color:#9c6c21; margin-left:6px; }
 .compact-checker .roster-status { margin:0; padding:8px; }
 .compact-checker .roster-panel { border-radius:7px; overflow:visible; }
-.checklist-tools { display:flex; gap:8px; align-items:center; padding:8px 10px 4px; }
-.checklist-tools input { flex:1; width:0; min-height:34px; padding:6px 9px; font-size:12px; }
-.checklist-tools select { width:105px; min-height:34px; padding:6px 9px; font-size:12px; }
+.checklist-tools { display:flex; gap:8px; align-items:center; padding:8px 10px; }
+.checklist-tools input:focus-visible, .checklist-tools select:focus-visible { outline-offset:-3px; }
+.checklist-tools input { min-width:0; flex:1; width:0; min-height:34px; padding:6px 9px; font-size:12px; }
+.checklist-tools select { flex-shrink:0; width:105px; min-height:34px; padding:6px 9px; font-size:12px; }
 .checklist-caption { display:flex; justify-content:space-between; align-items:center; gap:6px; padding:4px 10px 7px; color:#7a8972; font-size:10px; }
 .checklist-caption .save-indicator { font-size:10px; margin:0; }
 .compact-checker .table-scroll { overflow:visible; }
@@ -58,7 +59,7 @@ input.attack-check:disabled { cursor:wait; }
  .checklist-heading h1 { font-size:15px; }
  .checklist-heading > span { font-size:10px; }
  .checklist-heading b { font-size:14px; }
- .checklist-tools { gap:6px; padding:5px 6px 2px; }
+ .checklist-tools { gap:6px; padding:5px 6px; }
  .checklist-tools input, .checklist-tools select { min-height:32px; font-size:11px; }
  .checklist-tools select { width:95px; }
  .checklist-caption { padding:3px 6px 5px; font-size:10px; }
