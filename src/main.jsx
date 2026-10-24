@@ -12,6 +12,8 @@ import {
   csvCell,
 } from "../shared/domain.mjs";
 import "./style.css";
+import "./compact.css";
+import { AttackControl } from "./AttackControl.jsx";
 import { RosterEditor, GuildRegistration } from "./RosterEditor.jsx";
 
 function Icon({ name, size = 20, ...props }) {
@@ -504,7 +506,7 @@ function App() {
     </div>
   );
   return (
-    <div className="app">
+    <div className={`app ${view === "checker" ? "compact-checker" : ""}`}>
       <aside className="sidebar">
         <a className="brand" href="/guildWarCount">
           <span className="brand-mark">
@@ -619,15 +621,17 @@ function App() {
               更新
             </button>
           </div>
-          <div className="registration-toolbar">
-            <button
-              className="text-button"
-              onClick={() => setRegisterGuild((v) => !v)}
-            >
-              ＋ ギルドを登録
-            </button>
-            <span>公開名簿の取得と、攻撃記録の共有</span>
-          </div>
+          {view === "ranking" && (
+            <div className="registration-toolbar">
+              <button
+                className="text-button"
+                onClick={() => setRegisterGuild((v) => !v)}
+              >
+                ＋ ギルドを登録
+              </button>
+              <span>公開名簿の取得と、攻撃記録の共有</span>
+            </div>
+          )}
           {tierResponse?.stale && <div className="alert warning" role="status">{tierResponse.warning || "階級情報の更新が止まっています。保存済みの階級を表示しています。"}{tier && <button className="text-button" onClick={() => setTier("")}>すべて表示</button>}</div>}
           {registerGuild && (
             <GuildRegistration
@@ -645,7 +649,7 @@ function App() {
             <section className="help-panel">
               <h2>使い方と保存設定</h2>
               <p>
-                対応ギルドはRangerbookの公開名簿から取得できます。名簿と攻撃記録はこのサイトのDBに保存します。攻撃結果はゲーム内で確認してチェックしてください。2回目をチェックすると1回目もチェックされ、1回目を外すと2回目も外れます。
+                対応ギルドはRangerbookの公開名簿から取得できます。名簿と攻撃記録はこのサイトのDBに保存します。攻撃結果はゲーム内で確認してください。攻撃欄をタップすると「未攻撃 → ／（1回）→ ×（2回）→ 解除」と切り替わります。解除するとその日の2回分を外します。
               </p>
               <p>
                 味方と敵で別々のギルドを選べます。チェックはこのサイトのサーバーに保存し、他の端末には約15秒で反映します。週は月曜〜日曜、日付は日本時間09:00に切り替わります。
@@ -696,6 +700,7 @@ function App() {
           {view === "checker" ? (
             <>
               <div className="team-toolbar">
+                <button className="compact-ranking-link text-button" onClick={() => setView("ranking")}>ランキング</button>
                 <div className="segmented">
                   <button
                     className={team === "ally" ? "selected" : ""}
@@ -718,7 +723,20 @@ function App() {
                   味方・敵それぞれのギルドを選べます
                 </span>
               </div>
-              <section className="panel selection-panel">{controls}</section>
+              <details
+                className="panel selection-panel guild-selection"
+                key={team}
+                open={!gid}
+              >
+                <summary>ギルドを選択・変更</summary>
+                {controls}
+                <button
+                  className="text-button register-in-selection"
+                  onClick={() => setRegisterGuild((v) => !v)}
+                >
+                  ＋ ギルドを登録
+                </button>
+              </details>
               {gid && (
                 <>
                   <div className="guild-heading">
@@ -749,52 +767,62 @@ function App() {
                       共有リンク
                     </button>
                   </div>
-                  <div className="roster-status">
-                    <p>
-                      {roster?.mode === "snapshot"
-                        ? `閉鎖前に取得した保存名簿です（取得：${dateText(roster.fetchedAt)} JST）。入退会・改名は手動で反映してください。`
-                        : roster?.mode === "manual"
-                          ? "このサイトで管理している名簿です。ゲーム内での変更は「名簿を管理」から反映してください。"
-                          : roster?.needsSetup
-                            ? "公開名簿を取得できませんでした。「名簿を管理」から登録して利用できます。"
-                            : roster?.mode === "rangerbook"
-                              ? `Rangerbookの公開名簿（データ更新：${dateText(roster.fetchedAt)} JST）。表示名で照合します。改名・同名者は「名簿を管理」で確認してください。`
-                            : roster?.mode === "provider"
-                              ? "設定した独立した取得元から更新しています。"
-                              : ""}
-                    </p>
-                    {roster?.warning && !roster?.stale && <p role="status">{roster.warning}</p>}
-                    <button
-                      className="button secondary"
-                      disabled={rosterLoading || saving || editingRoster}
-                      onClick={async () => {
-                        const seq = generation.current;
-                        setRosterLoading(true);
-                        try {
-                          const result = await api(`/api/guilds/${gid}/sync`, {
-                            method: "POST",
-                            headers: token ? { authorization: `Bearer ${token}` } : {},
-                          });
-                          if (seq !== generation.current) return;
-                          setRoster(result);
-                          announce(result.stale ? "取得できないため、保存名簿を維持しました" : "公開名簿を反映しました");
-                        } catch (e) {
-                          if (seq === generation.current) setError(e.message);
-                        } finally {
-                          if (seq === generation.current) setRosterLoading(false);
-                        }
-                      }}
-                    >
-                      {rosterLoading ? "取得中…" : "公開名簿を取得"}
-                    </button>
-                    <button
-                      className="button secondary"
-                      disabled={rosterLoading || saving}
-                      onClick={() => setEditingRoster((v) => !v)}
-                    >
-                      名簿を管理
-                    </button>
-                  </div>
+                  <details
+                    className="roster-details"
+                    key={gid}
+                    open={roster?.needsSetup || undefined}
+                  >
+                    <summary>
+                      名簿の情報・管理
+                      {roster?.warning && <span className="roster-warning">要確認</span>}
+                    </summary>
+                    <div className="roster-status">
+                      <p>
+                        {roster?.mode === "snapshot"
+                          ? `閉鎖前に取得した保存名簿です（取得：${dateText(roster.fetchedAt)} JST）。入退会・改名は手動で反映してください。`
+                          : roster?.mode === "manual"
+                            ? "このサイトで管理している名簿です。ゲーム内での変更は「名簿を管理」から反映してください。"
+                            : roster?.needsSetup
+                              ? "公開名簿を取得できませんでした。「名簿を管理」から登録して利用できます。"
+                              : roster?.mode === "rangerbook"
+                                ? `Rangerbookの公開名簿（データ更新：${dateText(roster.fetchedAt)} JST）。表示名で照合します。改名・同名者は「名簿を管理」で確認してください。`
+                              : roster?.mode === "provider"
+                                ? "設定した独立した取得元から更新しています。"
+                                : ""}
+                      </p>
+                      {roster?.warning && !roster?.stale && <p role="status">{roster.warning}</p>}
+                      <button
+                        className="button secondary"
+                        disabled={rosterLoading || saving || editingRoster}
+                        onClick={async () => {
+                          const seq = generation.current;
+                          setRosterLoading(true);
+                          try {
+                            const result = await api(`/api/guilds/${gid}/sync`, {
+                              method: "POST",
+                              headers: token ? { authorization: `Bearer ${token}` } : {},
+                            });
+                            if (seq !== generation.current) return;
+                            setRoster(result);
+                            announce(result.stale ? "取得できないため、保存名簿を維持しました" : "公開名簿を反映しました");
+                          } catch (e) {
+                            if (seq === generation.current) setError(e.message);
+                          } finally {
+                            if (seq === generation.current) setRosterLoading(false);
+                          }
+                        }}
+                      >
+                        {rosterLoading ? "取得中…" : "公開名簿を取得"}
+                      </button>
+                      <button
+                        className="button secondary"
+                        disabled={rosterLoading || saving}
+                        onClick={() => setEditingRoster((v) => !v)}
+                      >
+                        名簿を管理
+                      </button>
+                    </div>
+                  </details>
                   {editingRoster && (
                     <RosterEditor
                       key={gid}
@@ -923,6 +951,22 @@ function App() {
                         ))}
                       </div>
                       <div className="member-tools">
+                        <select
+                          className="member-sort"
+                          aria-label="メンバーの並び順"
+                          value={`${sort.key}:${sort.dir}`}
+                          onChange={(e) => {
+                            const [key, dir] = e.target.value.split(":");
+                            setSort({ key, dir: Number(dir) });
+                          }}
+                        >
+                          <option value="name:1">名前 ↑</option>
+                          <option value="name:-1">名前 ↓</option>
+                          <option value="level:-1">レベル ↓</option>
+                          <option value="level:1">レベル ↑</option>
+                          <option value="pvp:1">PVP ↑</option>
+                          <option value="pvp:-1">PVP ↓</option>
+                        </select>
                         <div className="input-icon">
                           <Icon name="search" size={16} />
                           <input
@@ -951,8 +995,9 @@ function App() {
                         </button>
                       </div>
                     )}
-                    <div className="scroll-hint">
-                      表を左右にスクロールして攻撃欄を表示 →
+                    <div className="attack-legend">
+                      <span>— 未攻撃　／ 1回　× 2回</span>
+                      <span>タップで切替・2回の次は解除</span>
                     </div>
                     {rosterLoading ? (
                       <div className="loading" role="status">
@@ -965,144 +1010,50 @@ function App() {
                       </div>
                     ) : (
                       <div className="table-scroll">
-                        <table className="member-table">
+                        <table className="member-table compact-member-table">
+                          <colgroup>
+                            <col className="member-column" />
+                            {dates.map((d) => <col key={d} className="attack-column" />)}
+                            <col className="left-column" />
+                          </colgroup>
                           <thead>
                             <tr>
-                              <th rowSpan="2" className="row-number">
-                                #
-                              </th>
-                              <th rowSpan="2">
-                                <button onClick={() => sortBy("name")}>
-                                  メンバー <span>↕</span>
-                                </button>
-                              </th>
-                              <th rowSpan="2">
-                                <button onClick={() => sortBy("level")}>
-                                  レベル <span>↕</span>
-                                </button>
-                              </th>
-                              <th rowSpan="2">
-                                <button onClick={() => sortBy("pvp")}>
-                                  PVP <span>↕</span>
-                                </button>
+                              <th scope="col">
+                                <button onClick={() => sortBy("name")}>メンバー ↕</button>
                               </th>
                               {dates.map((d, i) => (
-                                <th
-                                  key={d}
-                                  colSpan="2"
-                                  className={
-                                    d === today
-                                      ? "today-col day-heading"
-                                      : "day-heading"
-                                  }
-                                >
-                                  <span>{["WED", "FRI", "SUN"][i]}</span>
-                                  {d.slice(5).replace("-", "/")}（
-                                  {["水", "金", "日"][i]}）
-                                  {d === today && <em>本日</em>}
+                                <th scope="col" key={d} className={d === today ? "today-col day-heading" : "day-heading"}>
+                                  {d.slice(5).replace("-", "/")}
+                                  <small>{["水", "金", "日"][i]}{d === today ? "・本日" : ""}</small>
                                 </th>
                               ))}
-                              <th rowSpan="2" className="remaining-col">
-                                週の残り
-                              </th>
-                            </tr>
-                            <tr>
-                              {dates.flatMap((d) =>
-                                [1, 2].map((s) => (
-                                  <th
-                                    key={`${d}-${s}`}
-                                    className={
-                                      d === today
-                                        ? "today-col slot-heading"
-                                        : "slot-heading"
-                                    }
-                                  >
-                                    {s}回目
-                                  </th>
-                                )),
-                              )}
+                              <th scope="col" className="remaining-col">週残</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {visibleMembers.map((m, i) => {
-                              const left = dates.reduce(
-                                (sum, d) =>
-                                  sum +
-                                  [1, 2].filter(
-                                    (s) => !checked(states, m.uid, d, s),
-                                  ).length,
-                                0,
-                              );
+                            {visibleMembers.map((m) => {
+                              const left = dates.reduce((sum, d) => sum + remaining([m], states, d), 0);
                               return (
                                 <tr key={m.uid}>
-                                  <td className="row-number">
-                                    {String(i + 1).padStart(2, "0")}
-                                  </td>
-                                  <td>
-                                    <div className="player">
-                                      <span
-                                        className={`player-avatar color-${i % 5}`}
-                                      >
-                                        {m.userName.slice(0, 1)}
-                                      </span>
-                                      <strong>{m.userName}</strong>
-                                    </div>
-                                  </td>
-                                  <td className="level">
-                                    {levelLabel(m.level)}
-                                  </td>
-                                  <td>
-                                    <span
-                                      className={`league ${m.pvpLeaguePhase === "LEGEND" ? "legend" : ""}`}
-                                    >
-                                      {leagueLabel(m.pvpLeaguePhase)}
-                                    </span>
-                                  </td>
-                                  {dates.flatMap((d) =>
-                                    [1, 2].map((s) => {
-                                      const v = checked(states, m.uid, d, s);
-                                      return (
-                                        <td
-                                          key={`${d}-${s}`}
-                                          className={
-                                            d === today
-                                              ? "today-col check-cell"
-                                              : "check-cell"
-                                          }
-                                        >
-                                          <label
-                                            className={`check-control ${v ? "is-checked" : ""}`}
-                                          >
-                                            <input
-                                              type="checkbox"
-                                              checked={v}
-                                              disabled={saving}
-                                              onChange={() =>
-                                                save(m.uid, d, s, !v)
-                                              }
-                                              aria-label={`${m.userName} ${d} ${s}回目`}
-                                            />
-                                            <span>
-                                              {v ? (
-                                                <Icon name="check" size={17} />
-                                              ) : (
-                                                <span className="unchecked-line" />
-                                              )}
-                                            </span>
-                                          </label>
-                                        </td>
-                                      );
-                                    }),
-                                  )}
+                                  <th scope="row" className="member-name">
+                                    <strong>{m.userName}</strong>
+                                    <small>{levelLabel(m.level)}{m.pvpLeaguePhase ? ` · ${leagueLabel(m.pvpLeaguePhase)}` : ""}</small>
+                                  </th>
+                                  {dates.map((d) => (
+                                    <td key={d} className={d === today ? "today-col check-cell" : "check-cell"}>
+                                      <AttackControl
+                                        name={m.userName}
+                                        day={d}
+                                        first={checked(states, m.uid, d, 1)}
+                                        second={checked(states, m.uid, d, 2)}
+                                        disabled={saving}
+                                        onChange={(slot, value) => save(m.uid, d, slot, value)}
+                                      />
+                                    </td>
+                                  ))}
                                   <td className="remaining-col">
-                                    <span
-                                      className={
-                                        left === 0
-                                          ? "count-badge complete"
-                                          : "count-badge"
-                                      }
-                                    >
-                                      {left === 0 ? "完了" : `${left} 回`}
+                                    <span className={left === 0 ? "count-badge complete" : "count-badge"}>
+                                      {left === 0 ? "済" : left}
                                     </span>
                                   </td>
                                 </tr>
@@ -1121,9 +1072,7 @@ function App() {
                     )}
                     <div className="table-footer">
                       <span>
-                        <span className="legend-square checked-square" />
-                        攻撃済み <span className="legend-square" />
-                        未攻撃
+                        タップ：未攻撃 → 1回 → 2回 → 解除
                       </span>
                       <span>
                         「残りあり」「未攻撃」は
@@ -1339,7 +1288,7 @@ function App() {
 }
 function Stat({ icon, label, value, unit, foot, accent = "" }) {
   return (
-    <div className={`stat ${accent}`}>
+    <div className={`stat ${accent}`} title={foot}>
       <div className="stat-header">
         <span>{label}</span>
         <Icon name={icon} size={19} />
