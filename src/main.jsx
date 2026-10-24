@@ -115,6 +115,8 @@ function App() {
       query.get("team") === "enemy" ? "enemy" : "ally",
     );
   const [country, setCountry] = useState(""),
+    [tier, setTier] = useState(""),
+    [tierResponse, setTierResponse] = useState(null),
     [search, setSearch] = useState(""),
     [rankLimit, setRankLimit] = useState("500");
   const [week, setWeek] = useState(initialWeek),
@@ -144,6 +146,13 @@ function App() {
     busy = useRef(false),
     noticeTimer = useRef();
   const gid = selection[team];
+  useEffect(() => {
+    const c = new AbortController();
+    api("/api/guild-tiers", { signal: c.signal }).then(setTierResponse).catch((e) => {
+      if (e.name !== "AbortError") setTierResponse({ tiers: [], stale: true, warning: "階級情報を取得できません。すべての階級から検索できます。" });
+    });
+    return () => c.abort();
+  }, [refresh]);
   const dates = useMemo(() => weekDates(week), [week]);
   const currentDay = dates.includes(today) ? today : dates[0];
   useEffect(() => {
@@ -259,7 +268,7 @@ function App() {
   }, [gid, team, week, refresh]);
   useEffect(() => {
     setPage(1);
-  }, [country, search, rankLimit, rankSort]);
+  }, [country, search, rankLimit, rankSort, tier]);
   function announce(s) {
     setNotice(s);
     clearTimeout(noticeTimer.current);
@@ -298,7 +307,8 @@ function App() {
       setSaving(false);
     }
   }
-  const guilds = guildResponse?.guilds || [];
+  const tiersByGuild = useMemo(() => new Map((tierResponse?.tiers || []).map((g) => [g.gid, g])), [tierResponse]);
+  const guilds = useMemo(() => (guildResponse?.guilds || []).map((g) => ({ ...g, guildWarTier: tiersByGuild.get(g.gid)?.tier })), [guildResponse, tiersByGuild]);
   const guild = guilds.find((g) => g.gid === gid);
   const members = roster?.members || [];
   const countryList = useMemo(
@@ -314,8 +324,9 @@ function App() {
         .filter(
           (g) =>
             (!country || g.nationalFlag === country) &&
+            (!tier || g.guildWarTier === tier) &&
             (!search || g.name.toLowerCase().includes(search.toLowerCase())) &&
-            (g.local ||
+            (tier || g.local ||
               rankLimit === "all" ||
               (g.lastGuildWarRank > 0 &&
                 g.lastGuildWarRank <= Number(rankLimit))),
@@ -324,7 +335,7 @@ function App() {
           (a, b) =>
             (a.lastGuildWarRank || 999999) - (b.lastGuildWarRank || 999999),
         ),
-    [guilds, country, search, rankLimit],
+    [guilds, country, search, rankLimit, tier],
   );
   const selectedOptions =
     guild && !listedGuilds.some((g) => g.gid === gid)
@@ -425,7 +436,7 @@ function App() {
     }
   }
   const controls = (
-    <div className="controls">
+    <div className={`controls${tier ? " tier-selected" : ""}`}>
       <label className="field search-field">
         <span>ギルドを探す</span>
         <div className="input-icon">
@@ -449,6 +460,14 @@ function App() {
         </select>
       </label>
       <label className="field">
+        <span>ギルド戦の階級</span>
+        <select value={tier} onChange={(e) => setTier(e.target.value)}>
+          <option value="">すべての階級</option>
+          <option value="LEGEND" disabled={!tierResponse?.tiers?.some((g) => g.tier === "LEGEND")}>レジェンド</option>
+          <option value="MASTER" disabled={!tierResponse?.tiers?.some((g) => g.tier === "MASTER")}>マスター</option>
+        </select>
+      </label>
+      {!tier && <label className="field">
         <span>ギルド戦順位</span>
         <select
           value={rankLimit}
@@ -458,7 +477,7 @@ function App() {
           <option value="500">上位500位</option>
           <option value="all">取得できた全ギルド</option>
         </select>
-      </label>
+      </label>}
       {view === "checker" && (
         <label className="field guild-field">
           <span>
@@ -609,6 +628,7 @@ function App() {
             </button>
             <span>公開名簿の取得と、攻撃記録の共有</span>
           </div>
+          {tierResponse?.stale && <div className="alert warning" role="status">{tierResponse.warning || "階級情報の更新が止まっています。保存済みの階級を表示しています。"}{tier && <button className="text-button" onClick={() => setTier("")}>すべて表示</button>}</div>}
           {registerGuild && (
             <GuildRegistration
               token={token}
@@ -1157,6 +1177,7 @@ function App() {
                         <tr>
                           <th>国</th>
                           <th>ギルド名</th>
+                          <th>階級</th>
                           {[
                             ["lastGuildWarRank", "ギルド戦順位"],
                             ["lastGuildWarScore", "戦績"],
@@ -1198,6 +1219,7 @@ function App() {
                                   <Icon name="arrow" size={14} />
                                 </button>
                               </td>
+                              <td>{g.guildWarTier === "LEGEND" ? "レジェンド" : g.guildWarTier === "MASTER" ? "マスター" : "—"}</td>
                               <td>
                                 <span
                                   className={

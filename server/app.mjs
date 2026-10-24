@@ -131,6 +131,10 @@ export function createApp({
       });
     },
   );
+  app.get("/api/guild-tiers", async (req, res) => {
+    const r = await sources.guildTiers();
+    res.json({ tiers: r.data, fetchedAt: r.observedAt || r.fetchedAt, stale: r.stale, warning: r.warning });
+  });
   app.get("/api/guilds", async (req, res) => {
     const r = await sources.guilds();
     res.json({

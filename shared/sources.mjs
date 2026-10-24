@@ -122,6 +122,15 @@ export function createSources(store, config = {}, requestJSON) {
   }
   return {
     syncMembers,
+    guildTiers: async () => {
+      try {
+        const result = await cached("rangerbook-ranking", 15 * 60000, [RANKING_URL], publicRankings);
+        const fresh = assertRecent(result.data.metadata);
+        return { ...result, observedAt: fresh, data: result.data.guilds.map((g) => ({ gid: g.gid, tier: g.tier, rank: g.rank })) };
+      } catch {
+        return { data: [], fetchedAt: null, stale: true, warning: "階級情報を取得できません。すべての階級から検索できます。" };
+      }
+    },
     guilds: async () => {
       let result;
       try {

@@ -95,6 +95,10 @@ export function createWorkerHandler(makeStore = createD1Store) {
             throw new Error("invalid input");
           return JSON.parse(text);
         }
+        if (path === "/api/guild-tiers" && request.method === "GET") {
+          const r = await sources.guildTiers();
+          return json({ tiers: r.data, fetchedAt: r.observedAt || r.fetchedAt, stale: r.stale, warning: r.warning });
+        }
         if (path === "/api/guilds" && request.method === "GET") {
           const r = await sources.guilds();
           return json({

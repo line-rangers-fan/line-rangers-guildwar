@@ -1729,3 +1729,41 @@ footer a {
     gap: 7px;
   }
 }
+
+/* Compact controls and summaries, with readable mobile tap targets. */
+main { padding-top: 22px; }
+.page-heading { margin-bottom: 14px; }
+.eyebrow { margin-bottom: 5px; }
+h1 { font-size: 24px; margin-bottom: 5px; }
+.selection-panel { padding: 14px 16px; }
+.controls { display: grid; grid-template-columns: minmax(170px, 1.6fr) repeat(3, minmax(110px, 1fr)); gap: 10px; }
+.controls.tier-selected { grid-template-columns: minmax(170px, 1.6fr) repeat(2, minmax(110px, 1fr)); }
+.controls .field { gap: 5px; }
+.controls .guild-field { grid-column: 1 / -1; }
+.stats { gap: 10px; margin-bottom: 14px; }
+.stat { padding: 12px 14px; }
+.stat-value { font-size: 29px; margin: 9px 0 6px; }
+.roster-status { gap: 8px; padding: 10px 12px; flex-wrap: wrap; }
+.roster-status p { flex: 1 1 300px; }
+.roster-top { padding: 13px 16px; }
+.member-table td { padding-top: 9px; padding-bottom: 9px; }
+.ranking-heading { padding: 14px 16px; }
+.registration-toolbar { margin-top: 0; margin-bottom: 10px; }
+@media (max-width: 900px) {
+  .controls, .controls.tier-selected { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  main { padding: 14px 12px 0; }
+  .page-heading { margin-bottom: 12px; }
+  h1 { font-size: 19px; }
+  .page-heading p { font-size: 11px; }
+  .selection-panel { padding: 12px; }
+  .controls { gap: 9px; }
+  .controls .field { width: auto; min-width: 0; }
+  .controls .search-field, .controls .guild-field { grid-column: 1 / -1; }
+  .controls select, .controls input { min-height: 44px; }
+  .stat { padding: 10px; }
+  .stat-value { font-size: 25px; }
+  .stats { gap: 8px; margin-bottom: 12px; }
+  .roster-status .button { min-height: 44px; flex: 1 1 auto; }
+}
