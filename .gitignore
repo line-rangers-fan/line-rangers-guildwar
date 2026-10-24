@@ -8,3 +8,5 @@ outputs/
 *.log
 worker/assets.generated.mjs
 worker-dist/
+
+pages-dist/

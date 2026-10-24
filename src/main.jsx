@@ -9,6 +9,7 @@ import {
 } from "../shared/domain.mjs";
 import "./style.css";
 import "./compact.css";
+import { apiURL, pagePath, publicBoardURL, transferToPublicSite, transferMessage } from "./runtime.mjs";
 import { loadPrivateBoard, savePrivateBoard, checkedEntries } from "../shared/boards.mjs";
 import { groupMembers } from "../shared/checklist.mjs";
 import { AttackControl } from "./AttackControl.jsx";
@@ -51,7 +52,7 @@ function Icon({ name, size = 20, ...props }) {
   );
 }
 async function api(path, options = {}) {
-  const r = await fetch(path, options);
+  const r = await fetch(apiURL(path), options);
   const d = await r.json();
   if (!r.ok) throw new Error(d.error || "通信に失敗しました");
   return d;
@@ -94,7 +95,7 @@ function loadChoice() {
 }
 function App() {
   const [view, setView] = useState(
-    location.pathname === "/guild-tracker" ? "ranking" : "checker",
+    location.pathname.replace(/\/$/, "").endsWith("/guild-tracker") ? "ranking" : "checker",
   );
   const [guildResponse, setGuildResponse] = useState(null),
     [guildError, setGuildError] = useState(""),
@@ -126,13 +127,11 @@ function App() {
     [rankSort, setRankSort] = useState({ key: "lastGuildWarRank", dir: 1 });
   const [editingRoster, setEditingRoster] = useState(false),
     [registerGuild, setRegisterGuild] = useState(false);
-  const [settings, setSettings] = useState(false),
-    [token, setToken] = useState(
-      () => sessionStorage.getItem("guildwar-write-token") || "",
+  const [token] = useState(
+      () => { try { return sessionStorage.getItem("guildwar-write-token") || ""; } catch { return ""; } },
     );
   const [refresh, setRefresh] = useState(0),
-    [notice, setNotice] = useState(""),
-    [health, setHealth] = useState(null);
+    [notice, setNotice] = useState(transferMessage);
   const generation = useRef(0),
     revision = useRef(0),
     busy = useRef(false),
@@ -186,9 +185,6 @@ function App() {
       .finally(() => {
         if (!c.signal.aborted) setGuildLoading(false);
       });
-    api("/api/health", { signal: c.signal })
-      .then(setHealth)
-      .catch(() => {});
     return () => c.abort();
   }, [refresh]);
   useEffect(() => {
@@ -203,7 +199,7 @@ function App() {
     history.replaceState(
       null,
       "",
-      `${view === "ranking" ? "/guild-tracker" : "/guildWarCount"}?${q}`,
+      `${pagePath(view)}?${q}`,
     );
   }, [selection, team, view, registeredGuilds, sort, filterDay, filter, sharing, currentDay]);
   useEffect(() => {
@@ -399,7 +395,7 @@ function App() {
     if (!gid || busy.current) return;
     const seq = generation.current;
     busy.current = true; setSaving(true); setError("");
-    const url = new URL("/guildWarCount", location.origin);
+    const url = publicBoardURL();
     url.searchParams.set("gid", gid); url.searchParams.set("share", "1"); url.searchParams.set("day", currentDay);
     try {
       if (!sharing) {
@@ -464,7 +460,7 @@ function App() {
   return (
     <div className={`app ${view === "checker" ? "compact-checker" : ""}`}>
       <aside className="sidebar">
-        <a className="brand" href="/guildWarCount">
+        <a className="brand" href={pagePath("checker")}>
           <span className="brand-mark">
             <Icon name="shield" size={26} />
           </span>
@@ -518,10 +514,6 @@ function App() {
           </p>
           <span className="fan-label">UNOFFICIAL FAN TOOL</span>
         </div>
-        <button className="settings" onClick={() => setSettings(!settings)}>
-          <Icon name="info" size={17} />
-          使い方・保存設定
-        </button>
       </aside>
       <div className="workspace">
         <header className="topbar">
@@ -532,13 +524,6 @@ function App() {
             </strong>
           </span>
           <div className="topbar-right">
-            <button
-              className="mobile-settings"
-              aria-label="使い方・保存設定"
-              onClick={() => setSettings((v) => !v)}
-            >
-              <Icon name="info" size={16} />
-            </button>
             <span className="jst">JST · 毎日 09:00 切り替え</span>
             <a
               href="https://github.com/line-rangers-fan"
@@ -552,6 +537,7 @@ function App() {
           </div>
         </header>
         <main>
+          {location.hostname.endsWith(".chatgpt.site") && <div className="site-migration"><span>新しいURLへ登録・自分用の記録を移せます。</span><button className="button" onClick={() => { try { transferToPublicSite(); } catch (e) { announce(e.message); } }}>新しいサイトへ移動</button></div>}
           <div className="page-heading">
             <div>
               <div className="eyebrow">
@@ -591,45 +577,6 @@ function App() {
           {tierResponse?.stale && <div className="alert warning" role="status">{tierResponse.warning || "階級情報の更新が止まっています。保存済みの階級を表示しています。"}{tier && <button className="text-button" onClick={() => setTier("")}>すべて表示</button>}</div>}
           {storageWarning && <div className="alert warning" role="alert">{storageWarning}</div>}
           {registerGuild && <GuildRegistration guilds={guilds} registeredGuilds={registeredGuilds} loading={guildLoading} error={guildError} onClose={() => setRegisterGuild(false)} onRegister={registerPersonal} />}
-          {settings && (
-            <section className="help-panel">
-              <h2>使い方と保存設定</h2>
-              <p>
-                対応ギルドはRangerbookの公開名簿から取得できます。名簿はサイトのDBで管理します。自分用のチェックはブラウザーに保存し、共有リンクを開いた場合だけサーバーで共有します。攻撃結果はゲーム内で確認してください。各曜日の「1回目」「2回目」をチェックします。2回目をチェックすると1回目も記録され、1回目を外すと2回目も外れます。
-              </p>
-              <p>
-                自分の登録ギルドから表示先を選べます。共有中のチェックはサーバーに保存し、同じURLの参加者には約15秒で反映します。自分用のチェックは他の人には反映されません。週は月曜〜日曜、日付は日本時間09:00に切り替わります。
-              </p>
-              {health?.writeProtected ? (
-                <label>
-                  保存用キー
-                  <input
-                    type="password"
-                    value={token}
-                    autoComplete="off"
-                    onChange={(e) => {
-                      setToken(e.target.value);
-                      sessionStorage.setItem(
-                        "guildwar-write-token",
-                        e.target.value,
-                      );
-                    }}
-                    placeholder="管理者から受け取ったキー"
-                  />
-                </label>
-              ) : (
-                <p>
-                  共有モードでは、同じ共有URLを開いた利用者がチェックを編集できます。自分用モードの記録は、このブラウザーだけに保存されます。
-                </p>
-              )}
-              <button
-                className="text-button"
-                onClick={() => setSettings(false)}
-              >
-                閉じる
-              </button>
-            </section>
-          )}
           {guildError && (
             <div role="alert" className="alert">
               {guildError}
@@ -650,7 +597,6 @@ function App() {
                   <button className="button" onClick={() => setView("ranking")}>ランキング</button>
                   <button className="button" onClick={() => setRefresh((n) => n + 1)} disabled={guildLoading || rosterLoading || saving}>更新</button>
                   <button className="button" onClick={share} disabled={!gid || saving || rosterLoading}>{sharing ? "共有リンクをコピー" : "共有リンクを作成"}</button>
-                  <button className="button" onClick={() => setSettings((v) => !v)}>使い方・保存設定</button>
                 </div>
                 <label className="personal-guild-field">自分の登録ギルド
                   <select aria-label="自分の登録ギルド" disabled={saving} value={personalGuilds.some((g) => g.gid === gid) ? gid : ""} onChange={(e) => { setSharing(false); setShareFallback(""); setSelection((s) => ({ ...s, [team]: e.target.value })); setMemberSearch(""); }}>
@@ -660,7 +606,7 @@ function App() {
                 </label>
                 <div className={`board-mode ${sharing ? "is-shared" : "is-private"}`} data-mode={sharing ? "shared" : "private"}>
                   <strong>{sharing ? "共有中" : "自分用"}</strong>
-                  <span>{sharing ? "同じURLを開いた人と同期（約15秒）" : "チェックはこのブラウザーだけに保存"}</span>
+                  <span>{sharing ? "同じリンクで共有・期限なし" : "チェックはこのブラウザーだけに保存"}</span>
                   {sharing && <button className="text-button" onClick={() => { setSharing(false); setShareFallback(""); if (personalSelection.current.ally) setSelection(personalSelection.current); }}>自分用へ戻る</button>}
                 </div>
                 {sharing && <p className="personal-note">このリンクを知っている人がチェックを編集できます。</p>}

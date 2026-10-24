@@ -1,3 +1,4 @@
+import { apiURL } from "./runtime.mjs";
 import React, { useState } from "react";
 import { LEAGUES } from "../shared/domain.mjs";
 export function RosterEditor({ gid, members, token, onSaved, onClose }) {
@@ -52,7 +53,7 @@ export function RosterEditor({ gid, members, token, onSaved, onClose }) {
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/guilds/${gid}/roster`, {
+      const response = await fetch(apiURL(`/api/guilds/${gid}/roster`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

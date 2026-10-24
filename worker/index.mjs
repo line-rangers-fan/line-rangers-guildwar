@@ -1,6 +1,7 @@
 import { createD1Store } from "./store.mjs";
 import { directoryGuilds } from "../shared/personal.mjs";
 import { validateShare } from "../shared/boards.mjs";
+import { trustedOrigin, corsHeaders } from "../shared/cors.mjs";
 import { createSources, normalizeMembers } from "../shared/sources.mjs";
 import { readCompactSnapshot } from "../shared/rangerbook.mjs";
 import { gameDate, validId, weekDates } from "../shared/domain.mjs";
@@ -30,7 +31,7 @@ async function remoteJSON(url, options = {}) {
   return options.compactGuilds ? readCompactSnapshot(r) : r.json();
 }
 export function createWorkerHandler(makeStore = createD1Store) {
-  return {
+  const handler = {
     async fetch(request, env) {
       try {
         const url = new URL(request.url),
@@ -83,7 +84,7 @@ export function createWorkerHandler(makeStore = createD1Store) {
           });
         if (request.method !== "GET" && request.method !== "HEAD") {
           const origin = request.headers.get("origin");
-          if (origin && new URL(origin).origin !== url.origin)
+          if (origin && !trustedOrigin(origin, url.origin))
             return json({ error: "別サイトからの保存はできません" }, 403);
           if (
             env.WRITE_TOKEN &&
@@ -267,5 +268,14 @@ export function createWorkerHandler(makeStore = createD1Store) {
       }
     },
   };
+  return { async fetch(request, env) {
+    const origin = request.headers.get("origin");
+    if (request.method === "OPTIONS" && new URL(request.url).pathname.startsWith("/api/")) {
+      return new Response(null, { status: trustedOrigin(origin, new URL(request.url).origin) ? 204 : 403, headers: corsHeaders(origin) });
+    }
+    const response = await handler.fetch(request, env);
+    if (new URL(request.url).pathname.startsWith("/api/")) for (const [key, value] of Object.entries(corsHeaders(origin))) response.headers.set(key, value);
+    return response;
+  } };
 }
 export default createWorkerHandler();

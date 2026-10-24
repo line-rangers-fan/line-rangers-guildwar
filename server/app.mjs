@@ -1,6 +1,7 @@
 import express from "express";
 import { directoryGuilds } from "../shared/personal.mjs";
 import { validateShare } from "../shared/boards.mjs";
+import { trustedOrigin, corsHeaders } from "../shared/cors.mjs";
 import { randomUUID } from "node:crypto";
 import { normalizeMembers } from "./sources.mjs";
 import { resolve } from "node:path";
@@ -25,6 +26,9 @@ export function createApp({
   app.use(express.json({ limit: "64kb" }));
   app.use("/api", (req, res, next) => {
     res.set("Cache-Control", "no-store");
+    const origin = req.get("origin");
+    if (origin) res.set(corsHeaders(origin));
+    if (req.method === "OPTIONS") return res.status(trustedOrigin(origin, `${req.protocol}://${req.get("host")}`) ? 204 : 403).end();
     next();
   });
   app.get("/api/health", (req, res) =>
@@ -46,7 +50,7 @@ export function createApp({
     const origin = req.get("origin");
     if (origin) {
       try {
-        if (new URL(origin).host !== req.get("host"))
+        if (new URL(origin).host !== req.get("host") && !trustedOrigin(origin, ""))
           return res
             .status(403)
             .json({ error: "別サイトからの保存はできません" });

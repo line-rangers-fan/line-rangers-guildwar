@@ -149,6 +149,11 @@ try {
   assert.equal(shared.states.member1["2026-10-25"][1], true);
   assert.equal(shared.states.member1["2026-10-25"][2], true);
   assert.equal((await req("/api/guilds/guild1/share", "POST", { week: "2026-10-23", entries: [{ uid: "outsider", day: "2026-10-25", slot: 1 }] })).status, 400);
+  const preflight = await worker.fetch(new Request("https://test.local/api/guilds/guild1/share", { method: "OPTIONS", headers: { origin: "https://line-rangers-fan.github.io", "access-control-request-method": "POST" } }), env);
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get("access-control-allow-origin"), "https://line-rangers-fan.github.io");
+  const pagesRead = await worker.fetch(new Request("https://test.local/api/health", { headers: { origin: "https://line-rangers-fan.github.io" } }), env);
+  assert.equal(pagesRead.headers.get("access-control-allow-origin"), "https://line-rangers-fan.github.io");
   console.log(
     "Worker/D1 smoke checks passed: routing, authentication, roster, atomic check invariants, team separation, rename.",
   );

@@ -4,9 +4,9 @@ LINEレンジャーのギルドランキング、メンバー名簿、ギルド�
 
 ## 公開サイト
 
-https://line-rangers-guildwar.eagerowl2.chatgpt.site/guildWarCount
+https://line-rangers-fan.github.io/line-rangers-guildwar/
 
-公開版はCloudflare WorkersとD1を使用し、名簿・共有チェックはD1に永続保存します。自分用のチェックはブラウザー内に保存します。ローカル版は引き続きNode.jsとSQLiteで動作します。既存のRender定義は代替の公開先として残しています。
+公開画面はGitHub Pagesで配信し、共有APIは既存のCloudflare WorkersとD1を使用します。名簿・共有チェックはD1に永続保存します。自分用のチェックはブラウザー内に保存します。ローカル版は引き続きNode.jsとSQLiteで動作します。既存のRender定義は代替の公開先として残しています。
 
 公開版のビルド・検証は `npm run build:worker` と `node scripts/check-worker.mjs` です。ホスティング設定は `.openai/hosting.json`、DBスキーマは `db/schema.ts`、適用済みの生成SQLと履歴は `drizzle/` にあります。変更時は `npm run db:generate` で新しいマイグレーションを追加し、適用済みSQLは編集しないでください。
 
@@ -132,3 +132,12 @@ npm start
 ```
 
 共有データ、キャッシュ、環境変数、node_modules、生成物はGitの管理対象外です。名簿や攻撃記録の移行には別途DBバックアップを使用してください。GitHubへのコード配置と、Renderなどへの本番公開は別の作業です。
+
+
+## 公開画面とAPIの接続
+
+`npm run build:pages` で `pages-dist/` を生成し、`.github/workflows/pages.yml` からGitHub Pagesへ公開します。画面と共有URLはGitHub Pages、名簿・共有チェックのAPIは従来のSites Workerです。APIは `https://line-rangers-fan.github.io` からのCORSリクエストだけ追加で許可します。
+
+以前の画面には「新しいサイトへ移動」ボタンを表示します。登録・並び順・自分用チェックだけをURLフラグメント経由でブラウザー内に移し、到着後はフラグメントを削除します。保存キーや認証情報は移しません。新しい画面に既存の自分用チェックがあれば上書きしません。共有記録は同じD1を利用するので移行で消えません。
+
+共有URLには有効期限を設定していません。「約15秒」は同期間隔の説明でしたが、画面から削除しました。定期同期は継続します。
