@@ -985,6 +985,13 @@ function App() {
               line-rangers-fan ↗
             </a>
           </footer>
+          <div className="contact-footer">
+            <p>問い合わせはこちらまで</p>
+            <a href="https://x.com/LINE288372" target="_blank" rel="noopener noreferrer">
+              <strong>LINEレンジャーは神ゲー</strong>
+              <span>@LINE288372 ↗</span>
+            </a>
+          </div>
         </main>
       </div>
       {notice && (

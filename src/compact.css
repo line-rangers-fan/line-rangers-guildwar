@@ -108,3 +108,9 @@ input.attack-check:disabled { cursor:wait; }
 
 .site-migration { display:flex; align-items:center; flex-wrap:wrap; gap:7px; padding:9px; margin-bottom:8px; border:1px solid #bfd3c0; border-radius:6px; background:#edf5e9; color:#426345; font-size:11px; }
 .site-migration .button { padding:5px 8px; margin-left:auto; font-size:11px; }
+.contact-footer { margin-top:20px; padding:18px 10px 24px; border-top:1px solid var(--border); text-align:center; }
+.contact-footer p { margin:0 0 8px; color:#74846f; font-size:12px; }
+.contact-footer a { display:inline-flex; flex-direction:column; gap:5px; padding:5px 10px; color:#356e49; }
+.contact-footer strong { font-size:14px; font-weight:600; }
+.contact-footer span { font-size:12px; }
+.contact-footer a:hover { color:#1d4c30; text-decoration:underline; }
