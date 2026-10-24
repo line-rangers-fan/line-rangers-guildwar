@@ -30,7 +30,7 @@
 .checklist-caption .save-indicator { font-size:10px; margin:0; }
 .compact-checker .table-scroll { overflow:visible; }
 .compact-checker .compact-member-table { width:100%; min-width:0; table-layout:fixed; white-space:normal; }
-.compact-member-table .attack-column { width:88px; }
+.compact-member-table .attack-column { width:42px; }
 .compact-member-table thead { position:sticky; top:0; z-index:4; }
 .compact-checker .compact-member-table thead th { background:#f6f9f2; text-align:center; font-size:12px; padding:0; border-bottom:1px solid var(--border); }
 .compact-checker .compact-member-table thead th:first-child { text-align:left; padding-left:10px; }
@@ -41,19 +41,15 @@
 .compact-checker .compact-member-table tbody .member-name { background:#fff; border-bottom:1px solid #edf1e7; padding:3px 10px; text-align:left; color:#304537; font-size:13px; line-height:1.2; overflow-wrap:anywhere; }
 .member-name strong { font-weight:550; }
 .compact-checker .compact-member-table .check-cell { padding:2px; height:36px; width:auto; border-bottom:1px solid #edf1e7; }
+.compact-checker .compact-member-table tbody td:nth-child(even),
+.compact-checker .compact-member-table thead tr:nth-child(2) th:nth-child(odd) { border-left:1px solid #e0e8d9; }
 /* Cancel the older table's sticky second column. */
 .compact-checker .compact-member-table thead tr:first-child th:nth-child(2),
 .compact-checker .compact-member-table tbody td:nth-child(2) { position:static; box-shadow:none; }
-.attack-mark { display:inline-grid; place-items:center; position:relative; width:62px; height:32px; padding:0; border:1px solid #dce6d6; background:#fff; border-radius:4px; color:#315f3f; vertical-align:middle; }
-.attack-mark[data-count="1"] { background:#fff4d9; border-color:#e3c67a; color:#906c14; }
-.attack-mark[data-count="2"] { background:#dcedd5; border-color:#b4d4a5; }
-.attack-strokes { position:relative; width:22px; height:22px; }
-.attack-strokes::before, .attack-strokes::after { content:""; position:absolute; top:10px; left:0; width:22px; height:2px; border-radius:1px; background:currentColor; }
-.attack-mark[data-count="0"] .attack-strokes::before { width:9px; left:6px; background:#bcc8b5; }
-.attack-mark[data-count="1"] .attack-strokes::before, .attack-mark[data-count="2"] .attack-strokes::before { transform:rotate(-43deg); }
-.attack-mark[data-count="2"] .attack-strokes::after { transform:rotate(43deg); }
-.attack-mark:not([data-count="2"]) .attack-strokes::after { display:none; }
-.attack-mark:focus-visible { outline:3px solid #80ad70; outline-offset:1px; }
+.attack-control { display:inline-flex; align-items:center; justify-content:center; width:100%; min-height:30px; cursor:pointer; }
+input.attack-check { appearance:auto; accent-color:#367447; width:26px; height:26px; min-height:0; padding:0; margin:0; border-radius:4px; cursor:pointer; }
+input.attack-check:disabled { cursor:wait; }
+.compact-checker .compact-member-table thead th.attack-slot-heading { padding:3px 0; font-size:10px; font-weight:500; color:#728568; }
 .compact-checker .table-footer { display:flex; justify-content:space-between; gap:8px; padding:7px 10px; font-size:10px; color:#83917c; }
 @media (max-width:600px) {
  .compact-checker main { padding:5px 5px 14px; }
@@ -66,11 +62,11 @@
  .checklist-tools input, .checklist-tools select { min-height:32px; font-size:11px; }
  .checklist-tools select { width:95px; }
  .checklist-caption { padding:3px 6px 5px; font-size:10px; }
- .compact-member-table .attack-column { width:53px; }
+ .compact-member-table .attack-column { width:32px; }
  .compact-checker .compact-member-table tbody .member-name { font-size:12px; padding:2px 5px; }
  .compact-checker .compact-member-table thead th:first-child { padding-left:5px; }
  .compact-checker .compact-member-table .check-cell { height:32px; padding:1px; }
- .attack-mark { width:calc(100% - 4px); max-width:47px; height:30px; }
+ input.attack-check { width:24px; height:24px; }
  .compact-checker .table-footer { padding:5px; font-size:9px; }
 }
-@media (max-width:350px) { .compact-member-table .attack-column { width:48px; } }
+@media (max-width:350px) { .compact-member-table .attack-column { width:30px; } }

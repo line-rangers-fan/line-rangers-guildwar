@@ -594,7 +594,7 @@ function App() {
             <section className="help-panel">
               <h2>使い方と保存設定</h2>
               <p>
-                対応ギルドはRangerbookの公開名簿から取得できます。名簿と攻撃記録はこのサイトのDBに保存します。攻撃結果はゲーム内で確認してください。攻撃欄をタップすると「未攻撃 → ／（1回）→ ×（2回）→ 解除」と切り替わります。解除するとその日の2回分を外します。
+                対応ギルドはRangerbookの公開名簿から取得できます。名簿と攻撃記録はこのサイトのDBに保存します。攻撃結果はゲーム内で確認してください。各曜日の「1回目」「2回目」をチェックします。2回目をチェックすると1回目も記録され、1回目を外すと2回目も外れます。
               </p>
               <p>
                 味方と敵で別々のギルドを選べます。チェックはこのサイトのサーバーに保存し、他の端末には約15秒で反映します。週は月曜〜日曜、日付は日本時間09:00に切り替わります。
@@ -776,7 +776,7 @@ function App() {
                       </select>
                     </div>
                     <div className="checklist-caption">
-                      <span>— 未攻撃　／ 1回　× 2回</span>
+                      <span>チェック＝攻撃済み</span>
                       <span className="save-indicator" role="status">{saving ? "保存中…" : error ? "未保存" : saved ? "保存済み" : "自動保存"}</span>
                     </div>
                     {error && (
@@ -801,20 +801,23 @@ function App() {
                         <table className="member-table compact-member-table">
                           <colgroup>
                             <col className="member-column" />
-                            {dates.map((d) => <col key={d} className="attack-column" />)}
+                            {dates.flatMap((d) => [1, 2].map((slot) => <col key={`${d}-${slot}`} className="attack-column" />))}
                           </colgroup>
                           <thead>
                             <tr>
-                              <th scope="col">
-                                <button onClick={() => sortBy("name")}>メンバー ↕</button>
+                              <th scope="col" rowSpan={2}>
+                                <button onClick={() => sortBy("name")}>名前 ↕</button>
                               </th>
                               {dates.map((d, i) => (
-                                <th scope="col" key={d} className={d === currentDay ? "selected-day day-heading" : "day-heading"}>
+                                <th scope="colgroup" colSpan={2} key={d} className={d === currentDay ? "selected-day day-heading" : "day-heading"}>
                                   <button className="day-filter" aria-pressed={d === currentDay} aria-label={`${d}の攻撃状況で絞り込み`} onClick={() => setFilterDay(d)}>
                                     {["水", "金", "日"][i]}<small>{d.slice(5).replace("-", "/")}{d === today ? " 本日" : ""}</small>
                                   </button>
                                 </th>
                               ))}
+                            </tr>
+                            <tr>
+                              {dates.flatMap((d) => [1, 2].map((slot) => <th scope="col" key={`${d}-${slot}`} className={d === currentDay ? "selected-day attack-slot-heading" : "attack-slot-heading"}>{slot}回目</th>))}
                             </tr>
                           </thead>
                           <tbody>
@@ -824,18 +827,18 @@ function App() {
                                   <th scope="row" className="member-name">
                                     <strong>{m.userName}</strong>
                                   </th>
-                                  {dates.map((d) => (
-                                    <td key={d} className={d === currentDay ? "selected-day check-cell" : "check-cell"}>
+                                  {dates.flatMap((d) => [1, 2].map((slot) => (
+                                    <td key={`${d}-${slot}`} className={d === currentDay ? "selected-day check-cell" : "check-cell"}>
                                       <AttackControl
                                         name={m.userName}
                                         day={d}
-                                        first={checked(states, m.uid, d, 1)}
-                                        second={checked(states, m.uid, d, 2)}
+                                        slot={slot}
+                                        value={checked(states, m.uid, d, slot)}
                                         disabled={saving}
-                                        onChange={(slot, value) => save(m.uid, d, slot, value)}
+                                        onChange={(value) => save(m.uid, d, slot, value)}
                                       />
                                     </td>
-                                  ))}
+                                  )))}
                                 </tr>
                               );
                             })}

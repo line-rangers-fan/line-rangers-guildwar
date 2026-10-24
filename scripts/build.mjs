@@ -1,5 +1,6 @@
 import { build } from "esbuild";
-import { mkdir, copyFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 await mkdir("dist", { recursive: true });
 await build({
   entryPoints: ["src/main.jsx"],
@@ -12,5 +13,11 @@ await build({
   sourcemap: false,
   legalComments: "eof",
 });
-await copyFile("src/index.html", "dist/index.html");
+let html = await readFile("src/index.html", "utf8");
+for (const ext of ["js", "css"]) {
+  const path = `/assets/app.${ext}`;
+  const version = createHash("sha256").update(await readFile(`dist${path}`)).digest("hex").slice(0, 12);
+  html = html.replace(path, `${path}?v=${version}`);
+}
+await writeFile("dist/index.html", html);
 console.log("Built dist/");
