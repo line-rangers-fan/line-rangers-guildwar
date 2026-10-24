@@ -671,7 +671,7 @@ function App() {
                           <thead>
                             <tr>
                               <th scope="col" rowSpan={2}>
-                                名前・レベル
+                                名前
                               </th>
                               {dates.map((d, i) => (
                                 <th scope="colgroup" colSpan={2} key={d} className={d === currentDay ? "selected-day day-heading" : "day-heading"}>
