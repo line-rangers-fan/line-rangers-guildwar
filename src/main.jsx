@@ -451,7 +451,7 @@ function App() {
             <Icon name="shield" size={26} />
           </span>
           <span>
-            Guild War Check<small>LINE RANGERS</small>
+            Guild War Note<small>LINE RANGERS</small>
           </span>
         </a>
         <div className="nav-label">GUILD MANAGEMENT</div>
@@ -527,11 +527,11 @@ function App() {
           <div className="page-heading">
             <div>
               <div className="eyebrow">
-                {view === "checker" ? "Guild War Check" : "GUILD RANKINGS"}
+                {view === "checker" ? "Guild War Note" : "GUILD RANKINGS"}
               </div>
               <h1>
                 {view === "checker"
-                  ? "Guild War Check"
+                  ? "Guild War Note"
                   : "ギルドランキング"}
               </h1>
               <p>
