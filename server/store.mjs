@@ -88,6 +88,15 @@ export function openStore(path) {
         throw e;
       }
     },
+    mergeChecks(gid, entries) {
+      const now = new Date().toISOString();
+      const q = db.prepare("INSERT INTO checks VALUES(?,?,?,?,?,?,?) ON CONFLICT(gid,team,uid,day,slot) DO UPDATE SET checked=1,updated_at=excluded.updated_at");
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        for (const e of entries) q.run(gid, "ally", e.uid, e.day, e.slot, 1, now);
+        db.exec("COMMIT");
+      } catch (e) { db.exec("ROLLBACK"); throw e; }
+    },
     getCache(key) {
       const r = db.prepare("SELECT * FROM cache WHERE key=?").get(key);
       return r

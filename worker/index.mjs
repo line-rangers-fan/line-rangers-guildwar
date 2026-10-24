@@ -1,5 +1,6 @@
 import { createD1Store } from "./store.mjs";
 import { directoryGuilds } from "../shared/personal.mjs";
+import { validateShare } from "../shared/boards.mjs";
 import { createSources, normalizeMembers } from "../shared/sources.mjs";
 import { readCompactSnapshot } from "../shared/rangerbook.mjs";
 import { gameDate, validId, weekDates } from "../shared/domain.mjs";
@@ -135,12 +136,20 @@ export function createWorkerHandler(makeStore = createD1Store) {
           return json({ guild: g }, 201);
         }
         const match = path.match(
-          /^\/api\/guilds\/([^/]+)\/(members|roster|checks|sync)$/,
+          /^\/api\/guilds\/([^/]+)\/(members|roster|checks|sync|share)$/,
         );
         if (!match) return json({ error: "APIが見つかりません" }, 404);
         const [, gid, action] = match;
         if (!validId(gid))
           return json({ error: "ギルドIDが正しくありません" }, 400);
+        if (action === "share" && request.method === "POST") {
+          const roster = await store.getRoster(gid) || await sources.members(gid);
+          let checked;
+          try { checked = validateShare(await body(), roster.data); }
+          catch (e) { return json({ error: e.message }, 400); }
+          await store.mergeChecks(gid, checked.entries);
+          return json({ states: await store.getChecks(gid, "ally", checked.dates[0], checked.dates[2]) });
+        }
         if ((action === "members" && request.method === "GET") || (action === "sync" && request.method === "POST")) {
           const r = action === "sync" ? await sources.syncMembers(gid) : await sources.members(gid);
           return json({

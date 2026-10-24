@@ -1,5 +1,6 @@
 import express from "express";
 import { directoryGuilds } from "../shared/personal.mjs";
+import { validateShare } from "../shared/boards.mjs";
 import { randomUUID } from "node:crypto";
 import { normalizeMembers } from "./sources.mjs";
 import { resolve } from "node:path";
@@ -158,6 +159,14 @@ export function createApp({
       stale: r.stale,
       warning: r.warning,
     });
+  });
+  app.post("/api/guilds/:gid/share", params, authorizeWrite, async (req, res) => {
+    const roster = store.getRoster(req.params.gid) || await sources.members(req.params.gid);
+    let checked;
+    try { checked = validateShare(req.body, roster.data); }
+    catch (e) { return res.status(400).json({ error: e.message }); }
+    await store.mergeChecks(req.params.gid, checked.entries);
+    res.json({ states: store.getChecks(req.params.gid, "ally", checked.dates[0], checked.dates[2]) });
   });
   app.post("/api/guilds/:gid/sync", params, authorizeWrite, async (req, res) => {
     const r = await sources.syncMembers(req.params.gid);

@@ -9,6 +9,7 @@ import {
 } from "../shared/domain.mjs";
 import "./style.css";
 import "./compact.css";
+import { loadPrivateBoard, savePrivateBoard, checkedEntries } from "../shared/boards.mjs";
 import { groupMembers } from "../shared/checklist.mjs";
 import { AttackControl } from "./AttackControl.jsx";
 import { PREFERENCES_KEY, loadPersonal, validSort } from "../shared/personal.mjs";
@@ -103,13 +104,15 @@ function App() {
   const [storageWarning, setStorageWarning] = useState("");
   const [selection, setSelection] = useState(loadChoice);
   const team = "ally";
+  const [sharing, setSharing] = useState(query.get("share") === "1");
+  const [shareFallback, setShareFallback] = useState("");
   const [country, setCountry] = useState(""),
     [tier, setTier] = useState(""),
     [tierResponse, setTierResponse] = useState(null),
     [search, setSearch] = useState(""),
     [rankLimit, setRankLimit] = useState("500");
   const [today, setToday] = useState(gameDate()),
-    [filterDay, setFilterDay] = useState(initialPersonal.filterDay),
+    [filterDay, setFilterDay] = useState(query.get("day") || initialPersonal.filterDay),
     [roster, setRoster] = useState(null),
     [states, setStates] = useState({}),
     [rosterLoading, setRosterLoading] = useState(false),
@@ -134,7 +137,8 @@ function App() {
     revision = useRef(0),
     busy = useRef(false),
     noticeTimer = useRef(),
-    migrationDone = useRef(false);
+    migrationDone = useRef(false),
+    personalSelection = useRef(initialPersonal.selection);
   const gid = selection[team];
   useEffect(() => {
     const c = new AbortController();
@@ -189,17 +193,19 @@ function App() {
   }, [refresh]);
   useEffect(() => {
     try {
-      localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ guilds: registeredGuilds, selection, team, sort, filterDay, filter }));
+      if (!sharing) personalSelection.current = selection;
+      localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ guilds: registeredGuilds, selection: personalSelection.current, team, sort, filterDay, filter }));
       setStorageWarning("");
     } catch { setStorageWarning("このブラウザーでは登録情報を保存できません。再訪時の維持には、ストレージを許可した通常のブラウザーをご利用ください。"); }
     const q = new URLSearchParams();
+    if (sharing) { q.set("share", "1"); q.set("day", currentDay); }
     if (selection.ally) q.set("gid", selection.ally);
     history.replaceState(
       null,
       "",
       `${view === "ranking" ? "/guild-tracker" : "/guildWarCount"}?${q}`,
     );
-  }, [selection, team, view, registeredGuilds, sort, filterDay, filter]);
+  }, [selection, team, view, registeredGuilds, sort, filterDay, filter, sharing, currentDay]);
   useEffect(() => {
     const seq = ++generation.current;
     const c = new AbortController();
@@ -210,28 +216,34 @@ function App() {
     setEditingRoster(false);
     if (!gid) { setRosterLoading(false); return () => c.abort(); }
     setRosterLoading(true);
+    async function readChecks() {
+      if (sharing) return api(`/api/guilds/${gid}/checks?team=${team}&week=${week}`, { signal: c.signal });
+      const saved = loadPrivateBoard(localStorage, gid, week);
+      if (saved.exists) return { states: saved.states };
+      let states = {}, migrated = false;
+      if (initialPersonal.guilds.some((g) => g.gid === gid)) {
+        const previous = await api(`/api/guilds/${gid}/checks?team=${team}&week=${week}`, { signal: c.signal });
+        states = previous.states;
+        migrated = Object.keys(states).length > 0;
+      }
+      if (!c.signal.aborted) savePrivateBoard(localStorage, gid, week, states);
+      return { states, migrated };
+    }
     Promise.all([
       api(`/api/guilds/${gid}/members`, { signal: c.signal }),
-      api(`/api/guilds/${gid}/checks?team=${team}&week=${week}`, {
-        signal: c.signal,
-      }),
+      readChecks(),
     ])
       .then(([r, s]) => {
-        if (seq === generation.current) {
-          setRoster(r);
-          setStates(s.states);
-        }
+        if (seq === generation.current) { setRoster(r); setStates(s.states); if (s.migrated) announce("以前のチェックを自分用に引き継ぎました。"); }
       })
       .catch((e) => {
-        if (e.name !== "AbortError" && seq === generation.current)
-          setError(e.message);
+        if (e.name !== "AbortError" && seq === generation.current) setError(e.message);
       })
       .finally(() => {
-        if (seq === generation.current && !c.signal.aborted)
-          setRosterLoading(false);
+        if (seq === generation.current && !c.signal.aborted) setRosterLoading(false);
       });
     const poll = setInterval(() => {
-      if (busy.current || document.hidden) return;
+      if (!sharing || busy.current || document.hidden) return;
       const rev = revision.current;
       api(`/api/guilds/${gid}/checks?team=${team}&week=${week}`, {
         signal: c.signal,
@@ -250,7 +262,7 @@ function App() {
       c.abort();
       clearInterval(poll);
     };
-  }, [gid, team, week, refresh]);
+  }, [gid, team, week, refresh, sharing]);
   useEffect(() => {
     setPage(1);
   }, [country, search, rankLimit, rankSort, tier]);
@@ -271,8 +283,14 @@ function App() {
     const nextDay = { ...states[uid]?.[day], [slot]: value };
     if (slot === 2 && value) nextDay[1] = true;
     if (slot === 1 && !value) nextDay[2] = false;
-    setStates({ ...states, [uid]: { ...states[uid], [day]: nextDay } });
+    const nextStates = { ...states, [uid]: { ...states[uid], [day]: nextDay } };
+    setStates(nextStates);
     try {
+      if (!sharing) {
+        savePrivateBoard(localStorage, gid, week, nextStates);
+        setSaved("自分用に保存");
+        return;
+      }
       const r = await api(`/api/guilds/${gid}/checks`, {
         method: "PUT",
         headers: {
@@ -294,7 +312,7 @@ function App() {
     } catch (e) {
       if (seq === generation.current) {
         setStates(previousStates);
-        setError(e.message);
+        setError(sharing ? e.message : "このブラウザーに保存できません。ストレージ容量や設定を確認してください。");
       }
     } finally {
       busy.current = false;
@@ -360,6 +378,7 @@ function App() {
     setSort((s) => ({ key, dir: s.key === key ? -s.dir : 1 }));
   }
   function registerPersonal(g) {
+    setSharing(false); setShareFallback("");
     setRegisteredGuilds((saved) => saved.some((r) => r.gid === g.gid) ? saved : [...saved, g]);
     setSelection((s) => ({ ...s, [team]: g.gid }));
     setRegisterGuild(false); setView("checker"); setMemberSearch(""); setFilter("all");
@@ -370,18 +389,32 @@ function App() {
     setSelection((s) => ({ ally: s.ally === gid ? "" : s.ally, enemy: s.enemy === gid ? "" : s.enemy }));
   }
   function openGuild(g) {
+    setSharing(false); setShareFallback("");
     setSelection((s) => ({ ...s, [team]: g.gid }));
     setView("checker");
     setMemberSearch("");
     setFilter("all");
   }
   async function share() {
+    if (!gid || busy.current) return;
+    const seq = generation.current;
+    busy.current = true; setSaving(true); setError("");
+    const url = new URL("/guildWarCount", location.origin);
+    url.searchParams.set("gid", gid); url.searchParams.set("share", "1"); url.searchParams.set("day", currentDay);
     try {
-      await navigator.clipboard.writeText(location.href);
-      announce("このギルドのリンクをコピーしました");
-    } catch {
-      announce("ブラウザのアドレスをコピーして共有してください");
-    }
+      if (!sharing) {
+        const result = await api(`/api/guilds/${gid}/share`, {
+          method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ week, entries: checkedEntries(states, members, dates) }),
+        });
+        if (seq !== generation.current) return;
+        setSharing(true); setStates(result.states);
+      }
+      setShareFallback(url.href);
+      try { await navigator.clipboard.writeText(url.href); announce("共有リンクをコピーしました。LINEに貼り付けて共有できます。"); }
+      catch { announce("共有を開始しました。表示されたURLをコピーしてください。"); }
+    } catch (e) { if (seq === generation.current) setError(e.message); }
+    finally { busy.current = false; setSaving(false); }
   }
   const controls = (
     <div className={`controls${tier ? " tier-selected" : ""}`}>
@@ -562,10 +595,10 @@ function App() {
             <section className="help-panel">
               <h2>使い方と保存設定</h2>
               <p>
-                対応ギルドはRangerbookの公開名簿から取得できます。名簿と攻撃記録はこのサイトのDBに保存します。攻撃結果はゲーム内で確認してください。各曜日の「1回目」「2回目」をチェックします。2回目をチェックすると1回目も記録され、1回目を外すと2回目も外れます。
+                対応ギルドはRangerbookの公開名簿から取得できます。名簿はサイトのDBで管理します。自分用のチェックはブラウザーに保存し、共有リンクを開いた場合だけサーバーで共有します。攻撃結果はゲーム内で確認してください。各曜日の「1回目」「2回目」をチェックします。2回目をチェックすると1回目も記録され、1回目を外すと2回目も外れます。
               </p>
               <p>
-                自分の登録ギルドから表示先を選べます。チェックはこのサイトのサーバーに保存し、他の端末には約15秒で反映します。週は月曜〜日曜、日付は日本時間09:00に切り替わります。
+                自分の登録ギルドから表示先を選べます。共有中のチェックはサーバーに保存し、同じURLの参加者には約15秒で反映します。自分用のチェックは他の人には反映されません。週は月曜〜日曜、日付は日本時間09:00に切り替わります。
               </p>
               {health?.writeProtected ? (
                 <label>
@@ -586,7 +619,7 @@ function App() {
                 </label>
               ) : (
                 <p>
-                  現在は共有編集モードです。同じギルドを開いた利用者がチェックを編集できます。
+                  共有モードでは、同じ共有URLを開いた利用者がチェックを編集できます。自分用モードの記録は、このブラウザーだけに保存されます。
                 </p>
               )}
               <button
@@ -616,16 +649,22 @@ function App() {
                 <div className="checker-actions">
                   <button className="button" onClick={() => setView("ranking")}>ランキング</button>
                   <button className="button" onClick={() => setRefresh((n) => n + 1)} disabled={guildLoading || rosterLoading || saving}>更新</button>
-                  <button className="button" onClick={share}>共有リンク</button>
+                  <button className="button" onClick={share} disabled={!gid || saving || rosterLoading}>{sharing ? "共有リンクをコピー" : "共有リンクを作成"}</button>
                   <button className="button" onClick={() => setSettings((v) => !v)}>使い方・保存設定</button>
                 </div>
                 <label className="personal-guild-field">自分の登録ギルド
-                  <select aria-label="自分の登録ギルド" disabled={saving} value={personalGuilds.some((g) => g.gid === gid) ? gid : ""} onChange={(e) => { setSelection((s) => ({ ...s, [team]: e.target.value })); setMemberSearch(""); }}>
+                  <select aria-label="自分の登録ギルド" disabled={saving} value={personalGuilds.some((g) => g.gid === gid) ? gid : ""} onChange={(e) => { setSharing(false); setShareFallback(""); setSelection((s) => ({ ...s, [team]: e.target.value })); setMemberSearch(""); }}>
                     <option value="">ギルドを選択してください</option>
                     {personalGuilds.map((g) => <option key={g.gid} value={g.gid}>{g.name}</option>)}
                   </select>
                 </label>
-                <p className="personal-note">登録と並び順はこのブラウザーに保存。攻撃チェックはギルドで共有します。</p>
+                <div className={`board-mode ${sharing ? "is-shared" : "is-private"}`} data-mode={sharing ? "shared" : "private"}>
+                  <strong>{sharing ? "共有中" : "自分用"}</strong>
+                  <span>{sharing ? "同じURLを開いた人と同期（約15秒）" : "チェックはこのブラウザーだけに保存"}</span>
+                  {sharing && <button className="text-button" onClick={() => { setSharing(false); setShareFallback(""); if (personalSelection.current.ally) setSelection(personalSelection.current); }}>自分用へ戻る</button>}
+                </div>
+                {sharing && <p className="personal-note">このリンクを知っている人がチェックを編集できます。</p>}
+                {shareFallback && <label className="share-url-field">LINEに貼り付ける共有URL<input aria-label="共有URL" readOnly value={shareFallback} onFocus={(e) => e.target.select()} /></label>}
                 <div className="personal-list-actions">
                 {personalGuilds.some((g) => g.gid === gid) && <button className="text-button" onClick={removePersonal}>選択中のギルドの登録を解除</button>}
                 <button className="text-button register-in-selection" onClick={() => setRegisterGuild((v) => !v)}>＋ ギルドを登録</button>
@@ -730,13 +769,13 @@ function App() {
                       </select>
                       <select aria-label="攻撃状況の表示順" value={filter} onChange={(e) => setFilter(e.target.value)}>
                         <option value="all">すべて</option>
-                        <option value="remaining">残りあり↑</option>
-                        <option value="none">未攻撃↑</option>
+                        <option value="attacked">攻撃済み</option>
+                        <option value="none">未攻撃</option>
                       </select>
                     </div>
                     <div className="checklist-caption">
                       <span><b className="ordering-day">対象：{dayLabel}</b>　チェック＝攻撃済み</span>
-                      <span className="save-indicator" role="status">{saving ? "保存中…" : error ? "未保存" : saved ? "保存済み" : "自動保存"}</span>
+                      <span className="save-indicator" role="status">{saving ? "保存中…" : error ? "未保存" : saved ? "保存済み" : sharing ? "共有に自動保存" : "自分用に自動保存"}</span>
                     </div>
                     {error && (
                       <div className="alert" role="alert">

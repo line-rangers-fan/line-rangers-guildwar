@@ -79,6 +79,12 @@ export function createD1Store(db) {
       }
       return result;
     },
+    async mergeChecks(gid, entries) {
+      const now = new Date().toISOString();
+      for (let i = 0; i < entries.length; i += 80) {
+        await db.batch(entries.slice(i, i + 80).map((e) => db.prepare("INSERT INTO checks VALUES(?,?,?,?,?,?,?) ON CONFLICT(gid,team,uid,day,slot) DO UPDATE SET checked=1,updated_at=excluded.updated_at").bind(gid, "ally", e.uid, e.day, e.slot, 1, now)));
+      }
+    },
     async saveCheck({ gid, team, uid, day, slot, checked }) {
       const now = new Date().toISOString();
       const q = (s, v) =>

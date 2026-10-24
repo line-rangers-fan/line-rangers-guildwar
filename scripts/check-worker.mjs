@@ -143,6 +143,12 @@ try {
     await req("/api/guilds/guild1/checks?week=2026-10-23")
   ).json();
   assert.equal(b.states.member1["2026-10-23"][2], false);
+  const imported = await req("/api/guilds/guild1/share", "POST", { week: "2026-10-23", entries: [{ uid: "member1", day: "2026-10-25", slot: 2 }] });
+  assert.equal(imported.status, 200);
+  const shared = await imported.json();
+  assert.equal(shared.states.member1["2026-10-25"][1], true);
+  assert.equal(shared.states.member1["2026-10-25"][2], true);
+  assert.equal((await req("/api/guilds/guild1/share", "POST", { week: "2026-10-23", entries: [{ uid: "outsider", day: "2026-10-25", slot: 1 }] })).status, 400);
   console.log(
     "Worker/D1 smoke checks passed: routing, authentication, roster, atomic check invariants, team separation, rename.",
   );

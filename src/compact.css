@@ -98,3 +98,10 @@ input.attack-check:disabled { cursor:wait; }
  .personal-note { margin:6px 0; font-size:10px; }
  .checklist-caption { font-size:9px; }
 }
+.board-mode { display:flex; align-items:center; flex-wrap:wrap; gap:5px 8px; margin:7px 0; padding:6px 8px; border-radius:5px; background:#f0f2ed; color:#63705f; font-size:10px; }
+.board-mode strong { font-size:11px; color:#36573a; }
+.board-mode.is-shared { background:#e8f2fa; color:#506e8b; }
+.board-mode.is-shared strong { color:#285e8a; }
+.board-mode .text-button { padding:0; font-size:10px; margin-left:auto; }
+.share-url-field { display:grid; gap:4px; font-size:10px; color:#637d8e; margin-bottom:8px; }
+.share-url-field input { font-size:11px; min-height:32px; padding:6px; }
