@@ -585,7 +585,7 @@ function App() {
                   <button className="button" onClick={() => setRefresh((n) => n + 1)} disabled={guildLoading || rosterLoading || saving}>更新</button>
                   <button className="button" onClick={share} disabled={!gid || saving || rosterLoading}>{sharing ? "共有リンクをコピー" : "共有リンクを作成"}</button>
                   {roster?.stale && members.length > 0 && <button className="button" onClick={() => setEditingRoster(true)}>名簿を管理</button>}
-                  {sharing && <button className="button" onClick={() => { setSharing(false); setShareFallback(""); if (personalSelection.current.ally) setSelection(personalSelection.current); }}>自分用へ戻る</button>}
+                  {sharing && <button className="button" onClick={() => { setSharing(false); setShareFallback(""); setSelection({ ...personalSelection.current }); }}>自分用へ戻る</button>}
                 </div>
                 <label className="personal-guild-field">自分の登録ギルド
                   <select aria-label="自分の登録ギルド" disabled={saving} value={personalGuilds.some((g) => g.gid === gid) ? gid : ""} onChange={(e) => { setSharing(false); setShareFallback(""); setSelection((s) => ({ ...s, [team]: e.target.value })); setMemberSearch(""); }}>
@@ -604,7 +604,7 @@ function App() {
                 <>
                   <div className="checklist-heading">
                     <h1>{guild?.name || "ギルド"} <small>{members.length}人</small></h1>
-                    <span>{!registeredGuilds.some((g) => g.gid === gid) && guild && <button className="text-button" onClick={() => registerPersonal(guild)}>自分に登録</button>}{currentDay.slice(5).replace("-", "/")} 残り <b>{rosterLoading ? "—" : dayRemaining}</b>回</span>
+                    <span className="checklist-summary">{!registeredGuilds.some((g) => g.gid === gid) && guild && <button className="text-button" onClick={() => registerPersonal(guild)}>自分に登録</button>}<span>{currentDay.slice(5).replace("-", "/")} 残り <b>{rosterLoading ? "—" : dayRemaining}</b>回</span></span>
                   </div>
                   {!rosterLoading && roster && members.length === 0 && <button className="button" onClick={() => setEditingRoster(true)}>メンバーを登録</button>}
                   {editingRoster && (
