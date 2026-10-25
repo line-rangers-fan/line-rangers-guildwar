@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { EnvHttpProxyAgent, fetch } from 'undici';
+import { catalogRoster } from '../src/public-roster.mjs';
 import { publicRankings, readCompactSnapshot, selectRoster, RANKING_URL, RANGERBOOK_BASE } from '../shared/rangerbook.mjs';
 const maxAge = Infinity;
 const agent = new EnvHttpProxyAgent();
@@ -9,9 +10,11 @@ async function download(url) {
   if (!r.ok) throw new Error(`HTTP ${r.status}: ${url}`);
   return r;
 }
+let rankedGuilds;
 const catalog = { generatedAt: new Date().toISOString(), guilds: {} };
 try {
   const ranking = publicRankings(await (await download(RANKING_URL)).json(), maxAge);
+  rankedGuilds = ranking.guilds.filter(g => g.rank >= 1 && g.rank <= 200);
   for (const tier of ['LEGEND','MASTER']) {
     try {
       const source = `${RANGERBOOK_BASE}/guildwar_data_${tier}.json`;
@@ -30,6 +33,19 @@ try {
     } catch(e) { console.warn(`${tier} catalog unavailable: ${e.message}`); }
   }
 } catch(e) { console.warn(`Roster catalog unavailable: ${e.message}`); }
+// An upstream outage must not replace working published rosters with an empty catalog.
+if (Object.keys(catalog.guilds).length < 200) {
+  try {
+    const previous = await (await download('https://line-rangers-fan.github.io/line-rangers-guildwar/data/rosters.json')).json();
+    for (const gid of Object.keys(previous.guilds || {})) {
+      const row = catalogRoster(previous, gid);
+      const current = rankedGuilds?.find(g => g.gid === gid && g.guildName === row?.name);
+      if (!row || catalog.guilds[gid] || (rankedGuilds && !current)) continue;
+      catalog.guilds[gid] = {...row, rank:current?.rank || row.rank};
+    }
+  } catch(e) { console.warn(`Previous catalog unavailable: ${e.message}`); }
+}
+if (!Object.keys(catalog.guilds).length) throw new Error('No roster data available; keep the previous deployment.');
 await mkdir('pages-dist/data', { recursive:true });
 await writeFile('pages-dist/data/rosters.json', JSON.stringify(catalog));
 await mkdir('pages-dist/data/rosters', { recursive:true });
