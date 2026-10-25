@@ -14,8 +14,9 @@ import { apiURL, pagePath, publicBoardURL, transferToPublicSite, transferMessage
 import { loadPrivateBoard, savePrivateBoard, checkedEntries } from "../shared/boards.mjs";
 import { groupMembers } from "../shared/checklist.mjs";
 import { loadRosterWithFallback } from "./public-roster.mjs";
+import { loadGuildDirectory } from "./public-directory.mjs";
 import { AttackControl } from "./AttackControl.jsx";
-import { PREFERENCES_KEY, loadPersonal, initialChoice, resetPersonal, directoryGuilds } from "../shared/personal.mjs";
+import { PREFERENCES_KEY, loadPersonal, initialChoice, resetPersonal } from "../shared/personal.mjs";
 import { RosterEditor, GuildRegistration } from "./RosterEditor.jsx";
 
 function Icon({ name, size = 20, ...props }) {
@@ -162,9 +163,9 @@ function App() {
     noticeTimer = useRef(),
     migrationDone = useRef(false),
     personalSelection = useRef(initialPersonal.selection);
-  const gid = (guildResponse
-    ? guildResponse.guilds.some((g) => g.gid === selection[team])
-    : guildError && registeredGuilds.some((g) => g.gid === selection[team] && g.lastGuildWarRank > 0 && g.lastGuildWarRank <= 200)) ? selection[team] : "";
+  const directoryUnavailable = Boolean(guildError || guildResponse?.stale);
+  const gid = (guildResponse?.guilds.some((g) => g.gid === selection[team]) ||
+    directoryUnavailable && registeredGuilds.some((g) => g.gid === selection[team] && g.lastGuildWarRank > 0 && g.lastGuildWarRank <= 200)) ? selection[team] : "";
   useEffect(() => {
     const c = new AbortController();
     if (view !== "ranking") return () => c.abort();
@@ -188,7 +189,7 @@ function App() {
     window.addEventListener("focus", updateGameDate);
     document.addEventListener("visibilitychange", updateGameDate);
     const refreshData = setInterval(() => {
-      if (!document.hidden && !busy.current) setRefresh((n) => n + 1);
+      if (!document.hidden && !busy.current && !editingRoster && !rankEditor) setRefresh((n) => n + 1);
     }, 300000);
     return () => {
       clearInterval(t);
@@ -196,22 +197,20 @@ function App() {
       window.removeEventListener("focus", updateGameDate);
       document.removeEventListener("visibilitychange", updateGameDate);
     };
-  }, []);
+  }, [editingRoster, rankEditor]);
   useEffect(() => {
     const c = new AbortController();
     setGuildLoading(true);
     setGuildError("");
-    // The deployed legacy API only understands limit=500; maxRank is honored by the updated API.
-    api("/api/guilds?limit=500&maxRank=200", { signal: c.signal })
-      .then((response) => {
-        const r = { ...response, guilds: directoryGuilds(response.guilds, 200) };
+    loadGuildDirectory({ api, signal: c.signal, catalogURL: new URL('data/rosters.json', publicBoardURL()) })
+      .then((r) => {
         setGuildResponse(r);
-        setRegisteredGuilds((saved) => saved.filter((g) => r.guilds.some((current) => current.gid === g.gid)));
+        // Directory availability and ranking changes must not delete personal registrations.
         // Migrate previous choices only when they match a real ranked guild ID.
         if (!migrationDone.current) {
           migrationDone.current = true;
           setRegisteredGuilds((saved) => {
-          const combined = new Map(saved.filter((g) => r.guilds.some((current) => current.gid === g.gid)).map((g) => [g.gid, g]));
+          const combined = new Map(saved.map((g) => [g.gid, g]));
           for (const id of Object.values(initialPersonal.selection)) {
             const g = r.guilds.find((g) => g.gid === id);
             if (g && !combined.has(id)) combined.set(id, g);
@@ -376,7 +375,7 @@ function App() {
   }
   const tiersByGuild = useMemo(() => new Map((tierResponse?.tiers || []).map((g) => [g.gid, g])), [tierResponse]);
   const guilds = useMemo(() => (guildResponse?.guilds || []).map((g) => ({ ...g, guildWarTier: tiersByGuild.get(g.gid)?.tier })), [guildResponse, tiersByGuild]);
-  const personalGuilds = useMemo(() => registeredGuilds.filter((saved) => guildResponse ? guilds.some((g) => g.gid === saved.gid) : saved.lastGuildWarRank > 0 && saved.lastGuildWarRank <= 200).map((saved) => guilds.find((g) => g.gid === saved.gid) || saved), [guilds, registeredGuilds, guildResponse]);
+  const personalGuilds = useMemo(() => registeredGuilds.filter((saved) => guilds.some((g) => g.gid === saved.gid) || directoryUnavailable && saved.lastGuildWarRank > 0 && saved.lastGuildWarRank <= 200).map((saved) => guilds.find((g) => g.gid === saved.gid) || saved), [guilds, registeredGuilds, directoryUnavailable]);
   const guild = guilds.find((g) => g.gid === gid) || personalGuilds.find((g) => g.gid === gid);
   const members = roster?.members || [];
   const rosterUnavailable = !roster || (members.length === 0 && roster.needsSetup);
@@ -628,7 +627,7 @@ function App() {
             <button
               className="button secondary refresh"
               onClick={() => setRefresh((n) => n + 1)}
-              disabled={guildLoading || rosterLoading || saving}
+              disabled={guildLoading || rosterLoading || saving || editingRoster || Boolean(rankEditor)}
             >
               <Icon name="refresh" size={17} />
               更新
@@ -665,9 +664,9 @@ function App() {
               <section id="checker-options-panel" className="panel checker-options-panel">
                 <div className="checker-actions">
                   <button className="button" onClick={() => setView("ranking")}>ランキング</button>
-                  <button className="button" onClick={() => setRefresh((n) => n + 1)} disabled={guildLoading || rosterLoading || saving}>更新</button>
+                  <button className="button" onClick={() => setRefresh((n) => n + 1)} disabled={guildLoading || rosterLoading || saving || editingRoster || Boolean(rankEditor)}>更新</button>
                   <button className="button" onClick={share} disabled={!gid || saving || rosterLoading}>{sharing ? "共有リンクをコピー" : "共有リンクを作成"}</button>
-                  {roster?.stale && members.length > 0 && <button className="button" onClick={() => setEditingRoster(true)}>名簿を管理</button>}
+                  {members.length > 0 && <button className="button" disabled={saving || rosterLoading} onClick={() => setEditingRoster(true)}>名簿を管理</button>}
                   {sharing && <button className="button" onClick={() => { setSharing(false); setShareFallback(""); setSelection({ ...personalSelection.current }); }}>自分用へ戻る</button>}
                 </div>
                 <label className="personal-guild-field">自分の登録ギルド
@@ -976,7 +975,7 @@ function App() {
                   JST
                 </>
               )}
-              。一覧は15分、公開名簿は30分キャッシュします。公開名簿の利用開始後は画面の再読込時に更新します。手動編集後は手動名簿を優先し、「公開名簿を取得」で自動更新に戻せます。PVPランクは配信されないため更新しません。
+              。一覧は15分、公開名簿は30分キャッシュします。自動取得中の名簿は画面の再読込時に更新します。手動編集・予備名簿の取り込み後は保存済み名簿を優先します。変更は「名簿を管理」で行えます。PvPランクは配信されません。
             </p>
             <p>
               ゲーム情報が最新とは限りません。ギルド一覧の取得が停止しても、保存済み・手動登録のギルドと名簿で攻撃チェックを継続できます。

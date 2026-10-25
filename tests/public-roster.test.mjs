@@ -26,4 +26,16 @@ test('zero-member source does not erase or save an empty roster',async()=>{
  const c=catalog();c.guilds.guild1.members=[];let writes=0;
  const result=await loadRosterWithFallback({gid:'guild1',fetchCatalog:async()=>Response.json(c),api:async(path,options)=>{if(options?.method==='PUT') writes++;return missing;}});
  assert.equal(writes,0);assert.equal(result.members.length,0);assert.ok(result.publicObservedAt);
+ assert.equal(result.needsSetup,true);assert.equal(result.stale,true);
+});
+test('empty manual roster is preserved both before and during catalog loading',async()=>{
+ const manual={members:[],mode:'manual'};
+ assert.equal(await loadRosterWithFallback({gid:'guild1',api:async()=>manual,fetchCatalog:async()=>assert.fail('manual roster must not be replaced')}),manual);
+ let reads=0;
+ const result=await loadRosterWithFallback({gid:'guild1',fetchCatalog:async()=>Response.json(catalog()),api:async(path,options)=>{assert.notEqual(options?.method,'PUT');return ++reads===1?missing:manual;}});
+ assert.equal(result,manual);
+});
+test('catalog save failure remains visible without displaying unsaved members as registered',async()=>{
+ const result=await loadRosterWithFallback({gid:'guild1',fetchCatalog:async()=>Response.json(catalog()),api:async(path,options)=>{if(options?.method==='PUT')throw Error('保存権限がありません');return missing;}});
+ assert.equal(result.members.length,0);assert.equal(result.needsSetup,true);assert.equal(result.stale,true);assert.match(result.warning,/保存権限がありません/);
 });
