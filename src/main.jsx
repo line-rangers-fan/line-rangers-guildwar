@@ -13,6 +13,7 @@ import "./compact.css";
 import { apiURL, pagePath, publicBoardURL, transferToPublicSite, transferMessage } from "./runtime.mjs";
 import { loadPrivateBoard, savePrivateBoard, checkedEntries } from "../shared/boards.mjs";
 import { groupMembers } from "../shared/checklist.mjs";
+import { loadRosterWithFallback } from "./public-roster.mjs";
 import { AttackControl } from "./AttackControl.jsx";
 import { PREFERENCES_KEY, loadPersonal, initialChoice, resetPersonal, directoryGuilds } from "../shared/personal.mjs";
 import { RosterEditor, GuildRegistration } from "./RosterEditor.jsx";
@@ -259,8 +260,12 @@ function App() {
       if (!c.signal.aborted) savePrivateBoard(localStorage, gid, week, states);
       return { states };
     }
+    const readRoster = () => loadRosterWithFallback({
+      api, gid, signal:c.signal, token,
+      catalogURL:new URL(`data/rosters/${gid}.json`, publicBoardURL()),
+    });
     Promise.all([
-      api(`/api/guilds/${gid}/members`, { signal: c.signal }),
+      readRoster(),
       readChecks(),
     ])
       .then(([r, s]) => {
@@ -684,6 +689,7 @@ function App() {
                     <h1>{guild?.name || "ギルド"} <small>{rosterLoading ? "取得中…" : rosterUnavailable ? "名簿未取得" : `${members.length}人`}</small></h1>
                     <span className="checklist-summary">{!registeredGuilds.some((g) => g.gid === gid) && guild && <button className="text-button" onClick={() => registerPersonal(guild)}>自分に登録</button>}<span>{currentDay.slice(5).replace("-", "/")} 残り <b>{rosterLoading || rosterUnavailable ? "—" : dayRemaining}</b>回</span></span>
                   </div>
+                  {roster?.publicObservedAt && <p className="personal-note">公開名簿の更新日時：{dateText(roster.publicObservedAt)} JST</p>}
                   {!rosterLoading && roster && members.length === 0 && <button className="button" onClick={() => setEditingRoster(true)}>メンバーを登録</button>}
                   {editingRoster && (
                     <RosterEditor

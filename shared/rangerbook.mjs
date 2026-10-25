@@ -4,17 +4,17 @@ import { validId } from "./domain.mjs";
 export const RANGERBOOK_BASE = "https://pvp-data.warmycat.com";
 export const RANKING_URL = `${RANGERBOOK_BASE}/guildwar_ranking.json`;
 const MAX_AGE = 6 * 60 * 60000;
-export function assertRecent(metadata) {
+export function assertRecent(metadata, maxAge = MAX_AGE) {
   const observed = Date.parse(metadata?.generatedAtUtc);
   const age = Date.now() - observed;
-  if (!Number.isFinite(observed) || age > MAX_AGE || age < -5 * 60000)
+  if (!Number.isFinite(observed) || age > maxAge || age < -5 * 60000)
     throw new Error("Rangerbookの名簿が古いため、保存済み名簿を維持します。");
   return metadata.generatedAtUtc;
 }
 
 // Retain only roster fields while streaming. Never buffer the full
 // 20–60 MB response in a Worker isolate, or put it into a D1 cache row.
-export async function readCompactSnapshot(response) {
+export async function readCompactSnapshot(response, maxAge = MAX_AGE) {
   const result = { metadata: null, guilds: [] };
   const parser = new JSONParser({ paths: ["$.metadata", "$.guilds.*.guildName", "$.guilds.*.curMemberCount", "$.guilds.*.members.*.name", "$.guilds.*.members.*.level"], keepStack: false });
   parser.onValue = ({ value, key, stack }) => {
@@ -49,13 +49,13 @@ export async function readCompactSnapshot(response) {
   } finally {
     reader.releaseLock();
   }
-  assertRecent(result.metadata);
+  assertRecent(result.metadata, maxAge);
   if (!result.guilds.length) throw new Error("名簿データがありません");
   return result;
 }
 
-export function publicRankings(input) {
-  assertRecent(input?.metadata);
+export function publicRankings(input, maxAge = MAX_AGE) {
+  assertRecent(input?.metadata, maxAge);
   if (!Array.isArray(input.guilds) || !input.guilds.length)
     throw new Error("Rangerbookのランキング形式が変わりました");
   const seen = new Set();
@@ -67,9 +67,9 @@ export function publicRankings(input) {
   return input;
 }
 
-export function selectRoster(ranking, snapshot, gid) {
-  assertRecent(ranking.metadata);
-  const observedAt = assertRecent(snapshot.metadata);
+export function selectRoster(ranking, snapshot, gid, maxAge = MAX_AGE) {
+  assertRecent(ranking.metadata, maxAge);
+  const observedAt = assertRecent(snapshot.metadata, maxAge);
   const guild = ranking.guilds.find((g) => g.gid === gid);
   if (!guild || ranking.guilds.filter((g) => g.guildName === guild.guildName).length !== 1)
     throw new Error("Rangerbookに対応するギルドを一意に特定できません。");
