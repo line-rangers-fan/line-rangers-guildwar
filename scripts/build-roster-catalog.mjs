@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { EnvHttpProxyAgent, fetch } from 'undici';
 import { publicRankings, readCompactSnapshot, selectRoster, RANKING_URL, RANGERBOOK_BASE } from '../shared/rangerbook.mjs';
-const maxAge = 48 * 3600000;
+const maxAge = Infinity;
 const agent = new EnvHttpProxyAgent();
 async function download(url) {
   const r = await fetch(url, { dispatcher: agent, signal: AbortSignal.timeout(120000) });
@@ -18,9 +18,9 @@ try {
       const snapshot = await readCompactSnapshot(await download(source), maxAge);
       for (const g of ranking.guilds.filter(g => g.tier === tier && g.rank >= 1 && g.rank <= 200)) {
         try {
-          const { members, observedAt } = selectRoster(ranking, snapshot, g.gid, maxAge);
+          const { members, observedAt, reportedMemberCount, incomplete } = selectRoster(ranking, snapshot, g.gid, maxAge);
           const seen = new Map();
-          catalog.guilds[g.gid] = { name:g.guildName, rank:g.rank, observedAt, source, members:members.map(m => {
+          catalog.guilds[g.gid] = { name:g.guildName, rank:g.rank, observedAt, source, reportedMemberCount, incomplete, members:members.map(m => {
             const occurrence = seen.get(m.name) || 0;
             seen.set(m.name, occurrence + 1);
             return { uid:'rb-'+createHash('sha256').update(JSON.stringify([g.gid,m.name,occurrence])).digest('hex').slice(0,32), userName:m.name, level:m.level, pvpLeaguePhase:'' };

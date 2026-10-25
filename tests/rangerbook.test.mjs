@@ -8,7 +8,7 @@ const metadata = () => ({ generatedAtUtc: new Date().toISOString() });
 const ranking = () => ({ metadata: metadata(), guilds: [{ gid: "guild1", guildName: "日本", rank: 10, tier: "LEGEND" }] });
 const snapshot = () => ({ metadata: metadata(), guilds: [{ guildName: "日本", rank: 2, curMemberCount: 1, members: [{ name: "名前", level: 500, guildwar: [{ private: "not retained" }] }] }] });
 
-test("streamed UTF-8 snapshot keeps only names and levels, rejecting stale or truncated JSON", async () => {
+test("streamed UTF-8 snapshot keeps only names and levels, accepting older metadata and rejecting truncated JSON", async () => {
   const bytes = new TextEncoder().encode(JSON.stringify(snapshot()));
   const r = await readCompactSnapshot(new Response(new ReadableStream({ start(c) {
     for (let i = 0; i < bytes.length; i += 7) c.enqueue(bytes.slice(i, i + 7));
@@ -17,13 +17,14 @@ test("streamed UTF-8 snapshot keeps only names and levels, rejecting stale or tr
   assert.deepEqual(r.guilds[0].members, [{ name: "名前", level: 500 }]);
   assert.equal(JSON.stringify(r).includes("private"), false);
   await assert.rejects(readCompactSnapshot(new Response('{"guilds":[')));
-  await assert.rejects(readCompactSnapshot(new Response(JSON.stringify({ ...snapshot(), metadata: { generatedAtUtc: "2020-01-01" } }))));
+  assert.equal((await readCompactSnapshot(new Response(JSON.stringify({ ...snapshot(), metadata: { generatedAtUtc: "2020-01-01" } })))).guilds.length, 1);
 });
 
-test("guilds are joined by unique name rather than rank, with count and freshness checks", () => {
+test("guilds are joined by unique name rather than rank, while keeping available members on count mismatch", () => {
   assert.equal(selectRoster(ranking(), snapshot(), "guild1").members[0].name, "名前");
   const countMismatch = snapshot(); countMismatch.guilds[0].curMemberCount = 2;
-  assert.throws(() => selectRoster(ranking(), countMismatch, "guild1"));
+  assert.equal(selectRoster(ranking(), countMismatch, "guild1").members.length, 1);
+  assert.equal(selectRoster(ranking(), countMismatch, "guild1").incomplete, true);
   const ambiguous = ranking(); ambiguous.guilds.push({ gid: "guild2", guildName: "日本" });
   assert.throws(() => selectRoster(ambiguous, snapshot(), "guild1"));
 });
@@ -65,7 +66,7 @@ test("public sync preserves checks, caches tier data, and survives outage withou
     assert.equal(store.getChecks("guild1", "ally", "2026-10-21", "2026-10-25").stable["2026-10-23"][2], true);
     const offline = createSources(store, {}, async () => { throw new Error("offline"); });
     store.putCache("rangerbook-ranking", ranking(), RANKING_URL);
-    const brokenSnapshot = snapshot(); brokenSnapshot.metadata.generatedAtUtc = "2020-01-01";
+    const brokenSnapshot = snapshot(); brokenSnapshot.metadata.generatedAtUtc = "invalid";
     store.putCache("rangerbook-snapshot:LEGEND", brokenSnapshot, "fixture");
     const result = await offline.members("guild1");
     assert.equal(result.stale, true);

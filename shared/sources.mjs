@@ -103,6 +103,7 @@ export function createSources(store, config = {}, requestJSON) {
         }, { compactGuilds: true });
         if (snapshot.stale) throw new Error("Rangerbookの公開名簿を更新できません。");
         const { members, observedAt } = selectRoster(ranking.data, snapshot.data, gid);
+        if (!members.length) throw new Error("配信元の公開名簿にメンバーがまだ収録されていません。");
         const { data, duplicates } = reconcileRoster(previous?.data || [], members);
         // Re-read after the network operation: do not race a manual edit.
         const current = await store.getRoster(gid);

@@ -3,11 +3,11 @@ import { validId } from "./domain.mjs";
 
 export const RANGERBOOK_BASE = "https://pvp-data.warmycat.com";
 export const RANKING_URL = `${RANGERBOOK_BASE}/guildwar_ranking.json`;
-const MAX_AGE = 6 * 60 * 60000;
+const MAX_AGE = Infinity;
 export function assertRecent(metadata, maxAge = MAX_AGE) {
   const observed = Date.parse(metadata?.generatedAtUtc);
   const age = Date.now() - observed;
-  if (!Number.isFinite(observed) || age > maxAge || age < -5 * 60000)
+  if (!Number.isFinite(observed) || (Number.isFinite(maxAge) && (age > maxAge || age < -5 * 60000)))
     throw new Error("Rangerbookの名簿が古いため、保存済み名簿を維持します。");
   return metadata.generatedAtUtc;
 }
@@ -76,11 +76,11 @@ export function selectRoster(ranking, snapshot, gid, maxAge = MAX_AGE) {
   const matches = snapshot.guilds.filter((g) => g.guildName === guild.guildName);
   if (matches.length !== 1) throw new Error("このギルドの公開名簿は取得できません。");
   const row = matches[0];
-  if (!Array.isArray(row.members) || row.members.length < 1 || row.members.length > 50 || row.members.length !== row.curMemberCount)
+  if (!Array.isArray(row.members) || row.members.length > 50)
     throw new Error("公開名簿の人数が一致しないため、保存済み名簿を維持します。");
   if (row.members.some((m) => typeof m.name !== "string" || !m.name.trim() || m.name.length > 100 || !Number.isInteger(m.level) || m.level < 1 || m.level > 10000))
     throw new Error("公開名簿に不正なメンバー情報があります。");
-  return { members: row.members, observedAt };
+  return { members: row.members, observedAt, reportedMemberCount: row.curMemberCount, incomplete: row.members.length !== row.curMemberCount };
 }
 
 export function reconcileRoster(previous, incoming, newId = () => `rb-${crypto.randomUUID()}`) {
