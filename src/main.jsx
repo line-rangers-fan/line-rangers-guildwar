@@ -368,6 +368,7 @@ function App() {
   const personalGuilds = useMemo(() => registeredGuilds.map((saved) => guilds.find((g) => g.gid === saved.gid) || saved), [guilds, registeredGuilds]);
   const guild = guilds.find((g) => g.gid === gid) || personalGuilds.find((g) => g.gid === gid);
   const members = roster?.members || [];
+  const rosterUnavailable = !roster || (members.length === 0 && roster.needsSetup);
   const countryList = useMemo(
     () =>
       [...new Set(guilds.map((g) => g.nationalFlag).filter(Boolean))].sort(
@@ -675,8 +676,8 @@ function App() {
               {gid && (
                 <>
                   <div className="checklist-heading">
-                    <h1>{guild?.name || "ギルド"} <small>{members.length}人</small></h1>
-                    <span className="checklist-summary">{!registeredGuilds.some((g) => g.gid === gid) && guild && <button className="text-button" onClick={() => registerPersonal(guild)}>自分に登録</button>}<span>{currentDay.slice(5).replace("-", "/")} 残り <b>{rosterLoading ? "—" : dayRemaining}</b>回</span></span>
+                    <h1>{guild?.name || "ギルド"} <small>{rosterLoading ? "取得中…" : rosterUnavailable ? "名簿未取得" : `${members.length}人`}</small></h1>
+                    <span className="checklist-summary">{!registeredGuilds.some((g) => g.gid === gid) && guild && <button className="text-button" onClick={() => registerPersonal(guild)}>自分に登録</button>}<span>{currentDay.slice(5).replace("-", "/")} 残り <b>{rosterLoading || rosterUnavailable ? "—" : dayRemaining}</b>回</span></span>
                   </div>
                   {!rosterLoading && roster && members.length === 0 && <button className="button" onClick={() => setEditingRoster(true)}>メンバーを登録</button>}
                   {editingRoster && (
@@ -795,12 +796,12 @@ function App() {
                           <div className="empty">
                             {members.length
                               ? "条件に一致するメンバーはいません。"
-                              : "メンバー情報がありません。"}
+                              : rosterUnavailable ? "公開名簿を取得できていません。配信元の未掲載・更新停止の可能性があります。「更新」で再取得するか、「メンバーを登録」から名簿を登録してください。" : "メンバー情報がありません。"}
                           </div>
                         )}
                       </div>
                     )}
-                    <div className="table-footer"><span>曜日を選ぶと、その日の攻撃状況で並べ替えます。</span><span>{visibleMembers.length} / {members.length}人</span></div>
+                    <div className="table-footer"><span>曜日を選ぶと、その日の攻撃状況で並べ替えます。</span><span>{rosterUnavailable ? "名簿未取得" : `${visibleMembers.length} / ${members.length}人`}</span></div>
                   </section>
                 </>
               )}
