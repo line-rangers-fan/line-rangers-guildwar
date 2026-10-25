@@ -99,6 +99,17 @@ function readPersonal() {
 function loadChoice() {
   return initialChoice(query);
 }
+function activeGameDay(date) {
+  const dates = weekDates(date);
+  return [...dates].reverse().find((day) => day <= date) || dates[0];
+}
+function initialGameDay(savedDay) {
+  const date = gameDate();
+  const dates = weekDates(date);
+  const requestedDay = query.get("day") || savedDay;
+  const activeDay = activeGameDay(date);
+  return dates.includes(requestedDay) && requestedDay >= activeDay ? requestedDay : activeDay;
+}
 function App() {
   const [view, setView] = useState(
     location.pathname.replace(/\/$/, "").endsWith("/guild-tracker") ? "ranking" : "checker",
@@ -119,7 +130,7 @@ function App() {
     [search, setSearch] = useState(""),
     [rankLimit, setRankLimit] = useState("500");
   const [today, setToday] = useState(gameDate()),
-    [filterDay, setFilterDay] = useState(query.get("day") || initialPersonal.filterDay),
+    [filterDay, setFilterDay] = useState(() => initialGameDay(initialPersonal.filterDay)),
     [roster, setRoster] = useState(null),
     [states, setStates] = useState({}),
     [rosterLoading, setRosterLoading] = useState(false),
@@ -140,6 +151,7 @@ function App() {
   const generation = useRef(0),
     revision = useRef(0),
     busy = useRef(false),
+    dateRef = useRef(today),
     noticeTimer = useRef(),
     migrationDone = useRef(false),
     personalSelection = useRef(initialPersonal.selection);
@@ -155,7 +167,13 @@ function App() {
   const dates = useMemo(() => weekDates(week), [week]);
   const currentDay = dates.includes(filterDay) ? filterDay : [...dates].reverse().find((d) => d <= today) || dates[0];
   useEffect(() => {
-    const updateGameDate = () => setToday(gameDate());
+    const updateGameDate = () => {
+      const nextDate = gameDate();
+      if (dateRef.current === nextDate) return;
+      dateRef.current = nextDate;
+      setToday(nextDate);
+      setFilterDay(activeGameDay(nextDate));
+    };
     const t = setInterval(updateGameDate, 30000);
     window.addEventListener("focus", updateGameDate);
     document.addEventListener("visibilitychange", updateGameDate);

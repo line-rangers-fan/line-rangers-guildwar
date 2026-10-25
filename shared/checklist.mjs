@@ -19,7 +19,6 @@ export function groupMembers(members, states, day, mode, sort) {
     { key: "once", label: "1回済み", members: once.sort(compare) },
     { key: "twice", label: "2回済み", members: twice.sort(compare) },
   ];
-  if (mode === "none") return groups.filter((group) => group.key === "pending" && group.members.length);
   if (mode === "once" || mode === "twice") return groups.filter((group) => group.key === mode && group.members.length);
   return (mode === "attacked" ? [...groups].reverse() : groups).filter((group) => group.members.length);
 }
