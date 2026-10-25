@@ -634,7 +634,6 @@ function App() {
               <span>公開名簿の取得と、攻撃記録の共有</span>
             </div>
           )}
-          {tierResponse?.stale && <div className="alert warning" role="status">{tierResponse.warning || "階級情報の更新が止まっています。保存済みの階級を表示しています。"}{tier && <button className="text-button" onClick={() => setTier("")}>すべて表示</button>}</div>}
           {storageWarning && <div className="alert warning" role="alert">{storageWarning}</div>}
           {registerGuild && <GuildRegistration guilds={guilds} registeredGuilds={registeredGuilds} loading={guildLoading} error={guildError} onClose={() => setRegisterGuild(false)} onRegister={registerPersonal} />}
           {guildError && (
