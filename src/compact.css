@@ -120,6 +120,3 @@ input.attack-check:disabled { cursor:wait; }
 .checklist-heading .checklist-summary { display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:4px 8px; white-space:normal; }
 .checklist-summary > span { white-space:nowrap; }
 .checklist-summary .text-button { margin:0; }
-
-.pvp-badge { display:inline-block; margin-left:5px; font-size:9px; font-weight:400; line-height:1.5; color:#7c8477; }
-.pvp-badge.is-known { padding:0 4px; border-radius:3px; background:#edf5e6; color:#356e49; }

@@ -1,4 +1,3 @@
-import { pvpLabel, matchPvp } from "../shared/pvp.mjs";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -6,6 +5,7 @@ import {
   remaining,
   weekDates,
   gameDate,
+  levelLabel,
 } from "../shared/domain.mjs";
 import "./style.css";
 import "./compact.css";
@@ -125,7 +125,6 @@ function App() {
     [rosterLoading, setRosterLoading] = useState(false),
     [error, setError] = useState(""),
     [saving, setSaving] = useState(false);
-  const [pvp, setPvp] = useState(null);
   const [memberSearch, setMemberSearch] = useState(""),
     [filter, setFilter] = useState(initialPersonal.filter),
     [sort] = useState({ key: "level", dir: -1 }),
@@ -309,15 +308,7 @@ function App() {
   const guilds = useMemo(() => (guildResponse?.guilds || []).map((g) => ({ ...g, guildWarTier: tiersByGuild.get(g.gid)?.tier })), [guildResponse, tiersByGuild]);
   const personalGuilds = useMemo(() => registeredGuilds.map((saved) => guilds.find((g) => g.gid === saved.gid) || saved), [guilds, registeredGuilds]);
   const guild = guilds.find((g) => g.gid === gid) || personalGuilds.find((g) => g.gid === gid);
-  useEffect(() => {
-    setPvp(null);
-    if (!gid) return;
-    const c = new AbortController();
-    api(`/api/guilds/${gid}/pvp`, { signal: c.signal }).then((data) => { if (!c.signal.aborted) setPvp(data); }).catch((e) => { if (e.name !== "AbortError") setPvp({ players: [], partial: true }); });
-    return () => c.abort();
-  }, [gid, refresh]);
   const members = roster?.members || [];
-  const pvpMatches = matchPvp(members, pvp?.players || []);
   const countryList = useMemo(
     () =>
       [...new Set(guilds.map((g) => g.nationalFlag).filter(Boolean))].sort(
@@ -702,7 +693,7 @@ function App() {
                               return (
                                 <tr key={m.uid} className="member-row" data-member-id={m.uid}>
                                   <th scope="row" className="member-name">
-                                    <strong>{m.userName}</strong><small className={`pvp-badge${pvpMatches.has(m.userName) ? " is-known" : ""}`} title={pvpMatches.has(m.userName) ? `掲載順位 ${pvpMatches.get(m.userName).rank}位・${dateText(pvpMatches.get(m.userName).observedAt)}取得` : "参照サイトの掲載範囲で、所属ギルドと名前が一意に一致する情報を確認できていません"}>PvP {pvp ? pvpLabel(pvpMatches.get(m.userName)?.league) : "確認中"}</small>
+                                    <strong>{m.userName}</strong><small className="sort-level">{levelLabel(m.level)}</small>
                                   </th>
                                   {dates.flatMap((d) => [1, 2].map((slot) => (
                                     <td key={`${d}-${slot}`} className={d === currentDay ? "selected-day check-cell" : "check-cell"}>
@@ -895,9 +886,8 @@ function App() {
                   JST
                 </>
               )}
-              。一覧は15分、公開名簿は30分キャッシュします。公開名簿の利用開始後は画面の再読込時に更新します。手動編集後は手動名簿を優先し、「公開名簿を取得」で自動更新に戻せます。PvPはLericoの全14ランク帯（レジェンド〜ブロンズ）の掲載データを30分キャッシュし、所属ギルドIDと名前を照合します。掲載範囲外・同名で特定できない人・6時間を超えた情報は「未確認」です。
+              。一覧は15分、公開名簿は30分キャッシュします。公開名簿の利用開始後は画面の再読込時に更新します。手動編集後は手動名簿を優先し、「公開名簿を取得」で自動更新に戻せます。PVPランクは配信されないため更新しません。
             </p>
-            {gid && <p>PvP取得：{pvp ? (pvp.partial ? "一部のランク帯を取得できませんでした。更新ボタンで再取得できます。" : "全14ランク帯の掲載情報を確認しました。") : "確認中"} <a href="https://rangers.lerico.net/ja/pvp-tracker" target="_blank" rel="noreferrer">PvP情報の取得元</a></p>}
             <p>
               ゲーム情報が最新とは限りません。ギルド一覧の取得が停止しても、保存済み・手動登録のギルドと名簿で攻撃チェックを継続できます。
             </p>

@@ -1,4 +1,3 @@
-import { PVP_BASE, PVP_LEAGUES, compactPvp, guildPvp } from "./pvp.mjs";
 import { validId } from "./domain.mjs";
 import { RANGERBOOK_BASE, RANKING_URL, publicRankings, selectRoster, reconcileRoster, assertRecent } from "./rangerbook.mjs";
 export function normalizeGuilds(input) {
@@ -123,17 +122,6 @@ export function createSources(store, config = {}, requestJSON) {
   }
   return {
     syncMembers,
-    pvp: async (gid) => {
-      const results = [];
-      // Small compact caches are shared by all guilds; bound upstream concurrency.
-      for (let i = 0; i < PVP_LEAGUES.length; i += 3) {
-        results.push(...await Promise.all(PVP_LEAGUES.slice(i, i + 3).map(async (league) => {
-          try { return await cached(`lerico-pvp-v1:${league}`, 30 * 60000, [PVP_BASE + league], (value) => compactPvp(value, league)); }
-          catch { return { data: [], stale: true }; }
-        })));
-      }
-      return { players: guildPvp(results.flatMap((r) => r.data), gid), partial: results.some((r) => r.stale), source: "https://rangers.lerico.net/ja/pvp-tracker" };
-    },
     guildTiers: async () => {
       try {
         const result = await cached("rangerbook-ranking", 15 * 60000, [RANKING_URL], publicRankings);

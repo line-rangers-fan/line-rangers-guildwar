@@ -151,9 +151,6 @@ export function createApp({
       warning: r.warning,
     });
   });
-  app.get("/api/guilds/:gid/pvp", params, async (req, res) => {
-    res.json(await sources.pvp(req.params.gid));
-  });
   app.get("/api/guilds/:gid/members", params, async (req, res) => {
     const r = await sources.members(req.params.gid);
     res.json({
