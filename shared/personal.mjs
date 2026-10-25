@@ -1,12 +1,12 @@
 import { validId, LEAGUES } from "./domain.mjs";
 export const PREFERENCES_KEY = "guildwar-personal-v1";
 export const DEFAULT_SORT = { key: "level", dir: -1 };
-export function directoryGuilds(input, limit = 500) {
+export function directoryGuilds(input, limit = 200) {
   const seen = new Set();
   return [...input].filter((g) => {
-    if (!validId(g.gid) || g.gid.startsWith("local-") || seen.has(g.gid) || !(g.lastGuildWarRank > 0 && g.lastGuildWarRank <= 500)) return false;
+    if (!validId(g.gid) || g.gid.startsWith("local-") || seen.has(g.gid) || !(g.lastGuildWarRank > 0 && g.lastGuildWarRank <= 200)) return false;
     seen.add(g.gid); return true;
-  }).sort((a, b) => a.lastGuildWarRank - b.lastGuildWarRank || a.gid.localeCompare(b.gid)).slice(0, Math.min(500, limit));
+  }).sort((a, b) => a.lastGuildWarRank - b.lastGuildWarRank || a.gid.localeCompare(b.gid)).slice(0, Math.min(200, Math.max(0, limit)));
 }
 export function validSort(sort) {
   return ["name", "level", "pvp"].includes(sort?.key) && [1, -1].includes(sort?.dir) ? { key: sort.key, dir: sort.dir } : { ...DEFAULT_SORT };

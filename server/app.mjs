@@ -144,7 +144,7 @@ export function createApp({
   app.get("/api/guilds", async (req, res) => {
     const r = await sources.guilds();
     res.json({
-      guilds: req.query.limit === "500" ? directoryGuilds(r.data) : r.data,
+      guilds: req.query.limit ? directoryGuilds(r.data, 200) : r.data,
       source: r.source,
       fetchedAt: r.fetchedAt,
       stale: r.stale,

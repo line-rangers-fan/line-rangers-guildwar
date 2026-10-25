@@ -105,7 +105,7 @@ export function createWorkerHandler(makeStore = createD1Store) {
         if (path === "/api/guilds" && request.method === "GET") {
           const r = await sources.guilds();
           return json({
-            guilds: url.searchParams.get("limit") === "500" ? directoryGuilds(r.data) : r.data,
+            guilds: url.searchParams.get("limit") ? directoryGuilds(r.data, 200) : r.data,
             source: r.source,
             fetchedAt: r.fetchedAt,
             stale: r.stale,

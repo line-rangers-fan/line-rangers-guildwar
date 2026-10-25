@@ -14,7 +14,7 @@ import { apiURL, pagePath, publicBoardURL, transferToPublicSite, transferMessage
 import { loadPrivateBoard, savePrivateBoard, checkedEntries } from "../shared/boards.mjs";
 import { groupMembers } from "../shared/checklist.mjs";
 import { AttackControl } from "./AttackControl.jsx";
-import { PREFERENCES_KEY, loadPersonal, initialChoice, resetPersonal } from "../shared/personal.mjs";
+import { PREFERENCES_KEY, loadPersonal, initialChoice, resetPersonal, directoryGuilds } from "../shared/personal.mjs";
 import { RosterEditor, GuildRegistration } from "./RosterEditor.jsx";
 
 function Icon({ name, size = 20, ...props }) {
@@ -130,7 +130,7 @@ function App() {
     [tier, setTier] = useState(""),
     [tierResponse, setTierResponse] = useState(null),
     [search, setSearch] = useState(""),
-    [rankLimit, setRankLimit] = useState("500");
+    [rankLimit, setRankLimit] = useState("200");
   const [today, setToday] = useState(gameDate()),
     [filterDay, setFilterDay] = useState(() => initialGameDay(initialPersonal.filterDay)),
     [roster, setRoster] = useState(null),
@@ -161,14 +161,17 @@ function App() {
     noticeTimer = useRef(),
     migrationDone = useRef(false),
     personalSelection = useRef(initialPersonal.selection);
-  const gid = selection[team];
+  const gid = (guildResponse
+    ? guildResponse.guilds.some((g) => g.gid === selection[team])
+    : guildError && registeredGuilds.some((g) => g.gid === selection[team] && g.lastGuildWarRank > 0 && g.lastGuildWarRank <= 200)) ? selection[team] : "";
   useEffect(() => {
     const c = new AbortController();
+    if (view !== "ranking") return () => c.abort();
     api("/api/guild-tiers", { signal: c.signal }).then(setTierResponse).catch((e) => {
       if (e.name !== "AbortError") setTierResponse({ tiers: [], stale: true, warning: "階級情報を取得できません。すべての階級から検索できます。" });
     });
     return () => c.abort();
-  }, [refresh]);
+  }, [refresh, view]);
   const week = weekDates(today)[0];
   const dates = useMemo(() => weekDates(week), [week]);
   const currentDay = dates.includes(filterDay) ? filterDay : [...dates].reverse().find((d) => d <= today) || dates[0];
@@ -197,19 +200,22 @@ function App() {
     const c = new AbortController();
     setGuildLoading(true);
     setGuildError("");
-    api("/api/guilds?limit=500", { signal: c.signal })
-      .then((r) => {
+    // The deployed legacy API only understands limit=500; maxRank is honored by the updated API.
+    api("/api/guilds?limit=500&maxRank=200", { signal: c.signal })
+      .then((response) => {
+        const r = { ...response, guilds: directoryGuilds(response.guilds, 200) };
         setGuildResponse(r);
+        setRegisteredGuilds((saved) => saved.filter((g) => r.guilds.some((current) => current.gid === g.gid)));
         // Migrate previous choices only when they match a real ranked guild ID.
         if (!migrationDone.current) {
           migrationDone.current = true;
           setRegisteredGuilds((saved) => {
-          const combined = new Map(saved.map((g) => [g.gid, g]));
+          const combined = new Map(saved.filter((g) => r.guilds.some((current) => current.gid === g.gid)).map((g) => [g.gid, g]));
           for (const id of Object.values(initialPersonal.selection)) {
             const g = r.guilds.find((g) => g.gid === id);
             if (g && !combined.has(id)) combined.set(id, g);
           }
-          return combined.size === saved.length ? saved : [...combined.values()];
+          return [...combined.values()];
           });
         }
       })
@@ -365,7 +371,7 @@ function App() {
   }
   const tiersByGuild = useMemo(() => new Map((tierResponse?.tiers || []).map((g) => [g.gid, g])), [tierResponse]);
   const guilds = useMemo(() => (guildResponse?.guilds || []).map((g) => ({ ...g, guildWarTier: tiersByGuild.get(g.gid)?.tier })), [guildResponse, tiersByGuild]);
-  const personalGuilds = useMemo(() => registeredGuilds.map((saved) => guilds.find((g) => g.gid === saved.gid) || saved), [guilds, registeredGuilds]);
+  const personalGuilds = useMemo(() => registeredGuilds.filter((saved) => guildResponse ? guilds.some((g) => g.gid === saved.gid) : saved.lastGuildWarRank > 0 && saved.lastGuildWarRank <= 200).map((saved) => guilds.find((g) => g.gid === saved.gid) || saved), [guilds, registeredGuilds, guildResponse]);
   const guild = guilds.find((g) => g.gid === gid) || personalGuilds.find((g) => g.gid === gid);
   const members = roster?.members || [];
   const rosterUnavailable = !roster || (members.length === 0 && roster.needsSetup);
@@ -498,7 +504,6 @@ function App() {
         >
           <option value="100">上位100位</option>
           <option value="200">上位200位</option>
-          <option value="500">上位500位</option>
         </select>
       </label>}
     </div>
@@ -810,7 +815,7 @@ function App() {
                   <Icon name="shield" size={36} />
                   <h2>ギルドを選んで始めましょう</h2>
                   <p>
-                    「＋ ギルドを登録」から上位500ギルドを選択できます。登録すると、次回も自分のリストから選べます。
+                    「＋ ギルドを登録」から上位200ギルドを選択できます。登録すると、次回も自分のリストから選べます。
                   </p>
                 </div>
               )}

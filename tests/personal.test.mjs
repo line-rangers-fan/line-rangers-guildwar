@@ -4,9 +4,9 @@ import {directoryGuilds,loadPersonal,PREFERENCES_KEY,memberComparator} from '../
 import {openStore} from '../server/store.mjs';
 import {createApp} from '../server/app.mjs';
 const allGuilds=Array.from({length:510},(_,i)=>({gid:`g-${i+1}`,name:`ギルド${i+1}`,lastGuildWarRank:i+1,nationalFlag:'JP'}));
-test('directory excludes synthetic duplicate guilds and caps ranked candidates at 500',()=>{
+test('directory excludes synthetic duplicate guilds and caps ranked candidates at 200',()=>{
  const result=directoryGuilds([...allGuilds,{...allGuilds[0]}, {gid:'local-fake',name:'ギルド1',lastGuildWarRank:1}]);
- assert.equal(result.length,500);assert.equal(result[499].lastGuildWarRank,500);assert.equal(new Set(result.map(g=>g.gid)).size,500);
+ assert.equal(result.length,200);assert.equal(result[199].lastGuildWarRank,200);assert.equal(new Set(result.map(g=>g.gid)).size,200);
 });
 test('personal lists survive serialization, stay isolated, and handle malformed storage',()=>{
  const data={guilds:[allGuilds[0],allGuilds[0]],selection:{ally:'g-1',enemy:'g-2'},team:'enemy',sort:{key:'level',dir:-1}};
@@ -26,7 +26,7 @@ test('name and level sorting retain distinct IDs for identical names',()=>{
 test('limited directory and stored-roster check saves work without member source calls',async()=>{
  const store=openStore(':memory:');let calls=0;store.putRoster('g-1',[{uid:'u-1',userName:'同名',level:100,pvpLeaguePhase:''}],'rangerbook');
  const server=createApp({store,sources:{guilds:async()=>({data:allGuilds}),members:async()=>{calls++;throw Error('slow upstream must not be used');}}}).listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const base=`http://127.0.0.1:${server.address().port}`;
- try{const list=await(await fetch(base+'/api/guilds?limit=500')).json();assert.equal(list.guilds.length,500);
+ try{const list=await(await fetch(base+'/api/guilds?limit=500')).json();assert.equal(list.guilds.length,200);
  const response=await fetch(base+'/api/guilds/g-1/checks',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({uid:'u-1',team:'ally',day:'2026-10-23',slot:2,checked:true})});assert.equal(response.status,200);const saved=await response.json();assert.equal(saved.states['u-1']['2026-10-23'][1],true);assert.equal(calls,0);
  }finally{await new Promise(r=>server.close(r));store.close();}
 });

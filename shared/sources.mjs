@@ -94,8 +94,8 @@ export function createSources(store, config = {}, requestJSON) {
         const ranking = await cached("rangerbook-ranking", 15 * 60000, [RANKING_URL], publicRankings);
         if (ranking.stale) throw new Error("Rangerbookのランキングを更新できません。");
         const guild = ranking.data.guilds.find((g) => g.gid === gid);
-        if (!guild || !["LEGEND", "MASTER", "DIAMOND"].includes(guild.tier))
-          throw new Error("このギルドはRangerbookの公開対象に含まれていません。");
+        if (!guild || !["LEGEND", "MASTER"].includes(guild.tier))
+          throw new Error("自動取得はレジェンド・マスター帯（上位200位）までが対象です。");
         const url = `${RANGERBOOK_BASE}/guildwar_data_${guild.tier}.json`;
         const snapshot = await cached(`rangerbook-snapshot:${guild.tier}`, 30 * 60000, [url], (value) => {
           assertRecent(value.metadata);
@@ -126,7 +126,7 @@ export function createSources(store, config = {}, requestJSON) {
       try {
         const result = await cached("rangerbook-ranking", 15 * 60000, [RANKING_URL], publicRankings);
         const fresh = assertRecent(result.data.metadata);
-        return { ...result, observedAt: fresh, data: result.data.guilds.map((g) => ({ gid: g.gid, tier: g.tier, rank: g.rank })) };
+        return { ...result, observedAt: fresh, data: result.data.guilds.filter((g) => ["LEGEND", "MASTER"].includes(g.tier) && g.rank <= 200).map((g) => ({ gid: g.gid, tier: g.tier, rank: g.rank })) };
       } catch {
         return { data: [], fetchedAt: null, stale: true, warning: "階級情報を取得できません。すべての階級から検索できます。" };
       }
