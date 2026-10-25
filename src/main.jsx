@@ -155,13 +155,18 @@ function App() {
   const dates = useMemo(() => weekDates(week), [week]);
   const currentDay = dates.includes(filterDay) ? filterDay : [...dates].reverse().find((d) => d <= today) || dates[0];
   useEffect(() => {
-    const t = setInterval(() => setToday(gameDate()), 30000);
+    const updateGameDate = () => setToday(gameDate());
+    const t = setInterval(updateGameDate, 30000);
+    window.addEventListener("focus", updateGameDate);
+    document.addEventListener("visibilitychange", updateGameDate);
     const refreshData = setInterval(() => {
       if (!document.hidden && !busy.current) setRefresh((n) => n + 1);
     }, 300000);
     return () => {
       clearInterval(t);
       clearInterval(refreshData);
+      window.removeEventListener("focus", updateGameDate);
+      document.removeEventListener("visibilitychange", updateGameDate);
     };
   }, []);
   useEffect(() => {
@@ -643,6 +648,8 @@ function App() {
                         <option value="all">すべて</option>
                         <option value="attacked">攻撃済み</option>
                         <option value="none">未攻撃</option>
+                        <option value="once">1回済み</option>
+                        <option value="twice">2回済み</option>
                       </select>
                     </div>
                     {error && (
