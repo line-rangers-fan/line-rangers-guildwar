@@ -7,6 +7,7 @@ export function attackCount(states, uid, day) {
 export function groupMembers(members, states, day, mode, sort) {
   const compare = memberComparator(sort);
   if (mode === "all") return [{ key: "all", label: "", members: [...members].sort(compare) }];
+  const compareAttacksFirst = (a, b) => attackCount(states, b.uid, day) - attackCount(states, a.uid, day) || compare(a, b);
   const pending = [], attacked = [];
   for (const member of members) {
     const count = attackCount(states, member.uid, day);
@@ -15,7 +16,7 @@ export function groupMembers(members, states, day, mode, sort) {
   }
   const groups = [
     { key: "pending", label: "未攻撃", members: pending.sort(compare) },
-    { key: "attacked", label: "攻撃済み", members: attacked.sort(compare) },
+    { key: "attacked", label: "攻撃済み", members: attacked.sort(compareAttacksFirst) },
   ];
   return (mode === "attacked" ? [...groups].reverse() : groups).filter((group) => group.members.length);
 }
