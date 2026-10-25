@@ -120,3 +120,15 @@ input.attack-check:disabled { cursor:wait; }
 .checklist-heading .checklist-summary { display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:4px 8px; white-space:normal; }
 .checklist-summary > span { white-space:nowrap; }
 .checklist-summary .text-button { margin:0; }
+
+.name-sort-heading { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+.name-sort-heading select { width:auto; max-width:125px; min-height:28px; padding:3px 5px; font-size:11px; }
+.compact-checker .member-rank-button { display:inline; background:none; border:0; padding:3px 0; min-height:30px; color:inherit; font:inherit; text-align:left; cursor:pointer; overflow-wrap:anywhere; }
+.member-pvp { display:block; color:#526e85; font-size:10px; font-weight:500; line-height:1.5; }
+.rank-dialog { width:min(360px, calc(100% - 32px)); border:1px solid #d8e1d5; border-radius:12px; padding:20px; color:#304432; }
+.rank-dialog::backdrop { background:rgb(0 0 0 / 40%); }
+.rank-dialog h2 { font-size:18px; margin:0 0 16px; overflow-wrap:anywhere; }
+.rank-dialog label { display:grid; gap:8px; }
+.rank-dialog select { width:100%; }
+.rank-dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
+.rank-dialog [role=alert] { color:#a12e27; }

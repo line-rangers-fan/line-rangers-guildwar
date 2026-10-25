@@ -6,6 +6,7 @@ import {
   weekDates,
   gameDate,
   levelLabel,
+  LEAGUES,
 } from "../shared/domain.mjs";
 import "./style.css";
 import "./compact.css";
@@ -68,6 +69,7 @@ const dateText = (s) =>
         minute: "2-digit",
       })
     : "—";
+const pvpRankText = (rank) => rank.replace("LEGEND", "レジェンド").replace("MASTER", "マスター").replace("DIAMOND", "ダイヤモンド").replace("GOLD", "ゴールド").replace("SILVER", "シルバー").replace("BRONZE", "ブロンズ").replace("_", " ");
 const flag = (c) =>
   /^[A-Z]{2}$/.test(c)
     ? String.fromCodePoint(...[...c].map((x) => 127397 + x.charCodeAt(0)))
@@ -138,9 +140,13 @@ function App() {
     [saving, setSaving] = useState(false);
   const [memberSearch, setMemberSearch] = useState(""),
     [filter, setFilter] = useState(initialPersonal.filter),
-    [sort] = useState({ key: "level", dir: -1 }),
+    [sort, setSort] = useState(() => initialPersonal.sort.key === "pvp" ? { key: "pvp", dir: -1 } : { key: "level", dir: -1 }),
     [page, setPage] = useState(1),
     [rankSort, setRankSort] = useState({ key: "lastGuildWarRank", dir: 1 });
+  const [rankEditor, setRankEditor] = useState(null);
+  const [rankError, setRankError] = useState("");
+  const rankDialog = useRef(null);
+  useEffect(() => { if (rankEditor) rankDialog.current?.showModal(); }, [rankEditor?.uid]);
   const [editingRoster, setEditingRoster] = useState(false),
     [registerGuild, setRegisterGuild] = useState(false);
   const [token] = useState(
@@ -236,6 +242,7 @@ function App() {
     setError("");
     setRoster(null);
     setEditingRoster(false);
+    setRankEditor(null);
     if (!gid) { setRosterLoading(false); return () => c.abort(); }
     setRosterLoading(true);
     async function readChecks() {
@@ -322,6 +329,35 @@ function App() {
         setStates(previousStates);
         setError(sharing ? e.message : "このブラウザーに保存できません。ストレージ容量や設定を確認してください。");
       }
+    } finally {
+      busy.current = false;
+      setSaving(false);
+    }
+  }
+  async function saveMemberRank(event) {
+    event.preventDefault();
+    if (!rankEditor || busy.current) return;
+    const seq = generation.current;
+    busy.current = true;
+    setSaving(true);
+    setRankError("");
+    try {
+      const latest = await api(`/api/guilds/${gid}/members`);
+      if (seq !== generation.current) return;
+      if (!latest.members.some((m) => m.uid === rankEditor.uid)) throw new Error("このメンバーは名簿から削除されています。");
+      const updated = latest.members.map((m) => m.uid === rankEditor.uid ? { ...m, pvpLeaguePhase: rankEditor.rank } : m);
+      const result = await api(`/api/guilds/${gid}/roster`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ members: updated }),
+      });
+      if (seq === generation.current) {
+        setRoster(result);
+        setRankEditor(null);
+        announce("PvPランク帯を保存しました");
+      }
+    } catch (error) {
+      if (seq === generation.current) setRankError(error.message);
     } finally {
       busy.current = false;
       setSaving(false);
@@ -525,6 +561,20 @@ function App() {
         </div>
       </aside>
       <div className="workspace">
+        {rankEditor && <dialog ref={rankDialog} className="rank-dialog" onCancel={(e) => { if (saving) e.preventDefault(); else setRankEditor(null); }}>
+          <form onSubmit={saveMemberRank}>
+            <h2>{rankEditor.name}</h2>
+            <label>PvPランク帯
+              <select autoFocus value={rankEditor.rank} disabled={saving} onChange={(e) => setRankEditor((current) => ({ ...current, rank: e.target.value }))}>
+                <option value="">未設定</option>
+                {[...new Set([...LEAGUES, ...(rankEditor.rank ? [rankEditor.rank] : [])])].map((rank) => <option key={rank} value={rank}>{pvpRankText(rank)}</option>)}
+              </select>
+            </label>
+            {rankError && <p role="alert">{rankError}</p>}
+            <div className="rank-dialog-actions"><button type="button" className="button" disabled={saving} onClick={() => setRankEditor(null)}>キャンセル</button><button className="button" type="submit" disabled={saving}>{saving ? "保存中…" : "保存"}</button></div>
+          </form>
+        </dialog>}
+
         <header className="topbar">
           <span>
             ギルド管理 <span className="slash">/</span>{" "}
@@ -695,7 +745,12 @@ function App() {
                           <thead>
                             <tr>
                               <th scope="col" rowSpan={2}>
-                                名前
+                                <span className="name-sort-heading">名前
+                                  <select aria-label="名前の並び順" value={sort.key} onChange={(e) => setSort({ key: e.target.value, dir: -1 })}>
+                                    <option value="level">レベル順</option>
+                                    <option value="pvp">PvPランク順</option>
+                                  </select>
+                                </span>
                               </th>
                               {dates.map((d, i) => (
                                 <th scope="colgroup" colSpan={2} key={d} className={d === currentDay ? "selected-day day-heading" : "day-heading"}>
@@ -716,7 +771,8 @@ function App() {
                               return (
                                 <tr key={m.uid} className="member-row" data-member-id={m.uid}>
                                   <th scope="row" className="member-name">
-                                    <strong>{m.userName}</strong><small className="sort-level">{levelLabel(m.level)}</small>
+                                    <button type="button" className="member-rank-button" disabled={saving} onClick={() => { setRankError(""); setRankEditor({ uid: m.uid, name: m.userName, rank: m.pvpLeaguePhase || "" }); }} aria-label={`${m.userName}のPvPランク帯を設定`}>{m.userName}</button><small className="sort-level">{levelLabel(m.level)}</small>
+                                    {m.pvpLeaguePhase && <span className="member-pvp">PvP {pvpRankText(m.pvpLeaguePhase)}</span>}
                                   </th>
                                   {dates.flatMap((d) => [1, 2].map((slot) => (
                                     <td key={`${d}-${slot}`} className={d === currentDay ? "selected-day check-cell" : "check-cell"}>

@@ -1,6 +1,6 @@
-import { validId } from "./domain.mjs";
+import { validId, LEAGUES } from "./domain.mjs";
 export const PREFERENCES_KEY = "guildwar-personal-v1";
-export const DEFAULT_SORT = { key: "name", dir: 1 };
+export const DEFAULT_SORT = { key: "level", dir: -1 };
 export function directoryGuilds(input, limit = 500) {
   const seen = new Set();
   return [...input].filter((g) => {
@@ -9,7 +9,7 @@ export function directoryGuilds(input, limit = 500) {
   }).sort((a, b) => a.lastGuildWarRank - b.lastGuildWarRank || a.gid.localeCompare(b.gid)).slice(0, Math.min(500, limit));
 }
 export function validSort(sort) {
-  return ["name", "level"].includes(sort?.key) && [1, -1].includes(sort?.dir) ? { key: sort.key, dir: sort.dir } : { ...DEFAULT_SORT };
+  return ["name", "level", "pvp"].includes(sort?.key) && [1, -1].includes(sort?.dir) ? { key: sort.key, dir: sort.dir } : { ...DEFAULT_SORT };
 }
 export function loadPersonal(storage) {
   const empty = { guilds: [], selection: { ally: "", enemy: "" }, team: "ally", sort: { ...DEFAULT_SORT }, filterDay: "", filter: "all" };
@@ -33,6 +33,13 @@ export function memberComparator(sort) {
   return (a, b) => {
     const name = a.userName.localeCompare(b.userName, "ja");
     const byLevel = Number(b.level || 0) - Number(a.level || 0);
+    if (sort.key === "pvp") {
+      const rank = (member) => {
+        const index = LEAGUES.indexOf(member.pvpLeaguePhase);
+        return index < 0 ? LEAGUES.length : index;
+      };
+      return rank(a) - rank(b) || byLevel || name || a.uid.localeCompare(b.uid);
+    }
     return (sort.key === "level" ? -sort.dir * byLevel : sort.dir * name) || name || a.uid.localeCompare(b.uid);
   };
 }
