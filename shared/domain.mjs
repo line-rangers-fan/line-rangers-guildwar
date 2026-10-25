@@ -19,8 +19,8 @@ export function japanDate(now = new Date()) {
   return new Date(now.getTime() + 9 * 3600000).toISOString().slice(0, 10);
 }
 export function gameDate(now = new Date()) {
-  return now.toISOString().slice(0, 10);
-} // JST 09:00 = UTC 00:00
+  return japanDate(now);
+} // Japan calendar date; the weekly reset happens Monday at 00:00 JST.
 export function weekDates(date = gameDate()) {
   const d = new Date(`${date}T00:00:00Z`);
   if (

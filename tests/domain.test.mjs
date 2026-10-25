@@ -9,15 +9,16 @@ import {
   csvCell,
 } from "../shared/domain.mjs";
 import { normalizeGuilds, normalizeMembers } from "../server/sources.mjs";
-test("JST 09:00 boundary, including Sunday to Monday", () => {
-  assert.equal(japanDate(new Date("2026-10-25T23:59:59Z")), "2026-10-26");
-  assert.equal(gameDate(new Date("2026-10-25T23:59:59Z")), "2026-10-25");
-  assert.deepEqual(weekDates(gameDate(new Date("2026-10-25T23:59:59Z"))), [
+test("Japan midnight boundary resets the week Sunday to Monday", () => {
+  assert.equal(japanDate(new Date("2026-10-25T14:59:59Z")), "2026-10-25");
+  assert.equal(gameDate(new Date("2026-10-25T14:59:59Z")), "2026-10-25");
+  assert.deepEqual(weekDates(gameDate(new Date("2026-10-25T14:59:59Z"))), [
     "2026-10-21",
     "2026-10-23",
     "2026-10-25",
   ]);
-  assert.deepEqual(weekDates(gameDate(new Date("2026-10-26T00:00:00Z"))), [
+  assert.equal(japanDate(new Date("2026-10-25T15:00:00Z")), "2026-10-26");
+  assert.deepEqual(weekDates(gameDate(new Date("2026-10-25T15:00:00Z"))), [
     "2026-10-28",
     "2026-10-30",
     "2026-11-01",

@@ -21,7 +21,12 @@ export function loadPersonal(storage) {
       if (!validId(g?.gid) || g.gid.startsWith("local-") || typeof g.name !== "string" || !g.name.trim() || seen.has(g.gid)) return false;
       seen.add(g.gid); return true;
     }).slice(0, 500);
-    return { guilds, selection: Object.fromEntries(["ally", "enemy"].map((team) => [team, validId(selection?.[team]) && !selection[team].startsWith("local-") ? selection[team] : ""])), team: "ally", sort: validSort(data?.sort), filterDay: typeof data?.filterDay === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.filterDay) ? data.filterDay : "", filter: data?.filter === "remaining" ? "none" : ["all", "attacked", "none", "once", "twice"].includes(data?.filter) ? data.filter : "all" };
+    const filter = ["all", "attacked", "none"].includes(data?.filter)
+      ? data.filter
+      : ["once", "twice"].includes(data?.filter)
+        ? "attacked"
+        : "all";
+    return { guilds, selection: Object.fromEntries(["ally", "enemy"].map((team) => [team, validId(selection?.[team]) && !selection[team].startsWith("local-") ? selection[team] : ""])), team: "ally", sort: validSort(data?.sort), filterDay: typeof data?.filterDay === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.filterDay) ? data.filterDay : "", filter: data?.filter === "remaining" ? "none" : filter };
   } catch { return empty; }
 }
 export function memberComparator(sort) {

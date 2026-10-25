@@ -533,7 +533,7 @@ function App() {
             </strong>
           </span>
           <div className="topbar-right">
-            <span className="jst">JST · 毎日 09:00 切り替え</span>
+            <span className="jst">JST · 毎週月曜 00:00 リセット</span>
             <a
               href="https://github.com/line-rangers-fan"
               target="_blank"
@@ -666,8 +666,6 @@ function App() {
                         <option value="all">すべて</option>
                         <option value="attacked">攻撃済み</option>
                         <option value="none">未攻撃</option>
-                        <option value="once">1回済み</option>
-                        <option value="twice">2回済み</option>
                       </select>
                     </div>
                     {error && (
