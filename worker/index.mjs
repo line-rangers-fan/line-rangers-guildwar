@@ -24,7 +24,7 @@ const json = (value, status = 200) =>
 const sessions = new WeakMap();
 async function remoteJSON(url, options = {}) {
   const r = await fetch(url, {
-    signal: AbortSignal.timeout(options.compactGuilds ? 90000 : 15000),
+    signal: AbortSignal.timeout(options.timeout || (options.compactGuilds ? 90000 : 15000)),
     headers: { accept: "application/json" },
   });
   if (!r.ok) throw new Error("upstream unavailable");

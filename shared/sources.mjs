@@ -1,5 +1,6 @@
 import { validId } from "./domain.mjs";
 import { RANGERBOOK_BASE, RANKING_URL, publicRankings, selectRoster, reconcileRoster, assertRecent } from "./rangerbook.mjs";
+import { REFERENCE_MAX_AGE, REFERENCE_MEMBERS_URL, normalizeReferenceMembers, withReferencePvp } from "./pvp.mjs";
 export function normalizeGuilds(input) {
   if (!Array.isArray(input) || !input.length || input.length > 20000)
     throw new Error("ギルド一覧の形式が変わっています");
@@ -121,7 +122,24 @@ export function createSources(store, config = {}, requestJSON) {
     pending.set(key, task);
     try { return await task; } finally { pending.delete(key); }
   }
-  return {
+  // Best-effort PvP ranks from the reference member list. A failure leaves the roster unannotated.
+  async function withPvpReference(gid, roster) {
+    if (!roster.data?.length) return roster;
+    try {
+      const reference = await cached(
+        `reference-members:${gid}`,
+        30 * 60000,
+        [REFERENCE_MEMBERS_URL.replace("{gid}", encodeURIComponent(gid))],
+        normalizeReferenceMembers,
+        { timeout: 5000 },
+      );
+      if (reference.stale && Date.now() - Date.parse(reference.fetchedAt) > REFERENCE_MAX_AGE) return roster;
+      return { ...roster, data: withReferencePvp(roster.data, reference.data) };
+    } catch {
+      return roster;
+    }
+  }
+  const sources = {
     syncMembers,
     guildTiers: async () => {
       try {
@@ -222,5 +240,10 @@ export function createSources(store, config = {}, requestJSON) {
         needsSetup: true,
       };
     },
+  };
+  return {
+    ...sources,
+    syncMembers: async (gid) => withPvpReference(gid, await syncMembers(gid)),
+    members: async (gid) => withPvpReference(gid, await sources.members(gid)),
   };
 }

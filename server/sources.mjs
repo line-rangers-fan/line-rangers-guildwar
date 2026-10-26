@@ -6,7 +6,7 @@ const agent = new EnvHttpProxyAgent();
 async function getJSON(url, options = {}) {
   const response = await fetch(url, {
     dispatcher: agent,
-    signal: AbortSignal.timeout(options.compactGuilds ? 90000 : 25000),
+    signal: AbortSignal.timeout(options.timeout || (options.compactGuilds ? 90000 : 25000)),
     headers: {
       accept: "application/json",
       "user-agent": "line-rangers-guildwar/1.0 (read-only fan tool)",

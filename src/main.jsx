@@ -782,7 +782,7 @@ function App() {
                                 <tr key={m.uid} className="member-row" data-member-id={m.uid}>
                                   <th scope="row" className="member-name">
                                     <button type="button" className="member-rank-button" disabled={saving} onClick={() => { setRankError(""); setRankEditor({ uid: m.uid, name: m.userName, rank: m.pvpLeaguePhase || "" }); }} aria-label={`${m.userName}のPvPランク帯を設定`}>{m.userName}</button><small className="sort-level">{levelLabel(m.level)}</small>
-                                    {m.pvpLeaguePhase && <span className="member-pvp">PvP {pvpRankText(m.pvpLeaguePhase)}</span>}
+                                    {(m.pvpLeaguePhase || m.pvpReference) && <span className="member-pvp" title={m.pvpLeaguePhase ? undefined : "元サイトのメンバー情報から補完"}>PvP {pvpRankText(m.pvpLeaguePhase || m.pvpReference)}</span>}
                                   </th>
                                   {dates.flatMap((d) => [1, 2].map((slot) => (
                                     <td key={`${d}-${slot}`} className={d === currentDay ? "selected-day check-cell" : "check-cell"}>
@@ -962,7 +962,7 @@ function App() {
               >
                 LINE Rangers Handbook（Lerico）
               </a>
-              。メンバー名簿は <a href="https://rangerbook.warmycat.com" target="_blank" rel="noreferrer">Rangerbook</a> の公開配信から取得し、このサイトのDBに保存します。閉鎖予定の元サイトへの通信は行いません。いずれも第三者サービスで、LINE公式APIではありません。Rangerbook側の収集元は未確認です。
+              。メンバー名簿は <a href="https://rangerbook.warmycat.com" target="_blank" rel="noreferrer">Rangerbook</a> の公開配信から取得し、このサイトのDBに保存します。閉鎖予定の元サイトへの通信は行いません（PvPランクの補完だけは例外です）。いずれも第三者サービスで、LINE公式APIではありません。Rangerbook側の収集元は未確認です。
             </p>
             <p>
               一覧取得：{dateText(guildResponse?.fetchedAt)} JST
@@ -975,7 +975,7 @@ function App() {
                   JST
                 </>
               )}
-              。一覧は15分、公開名簿は30分キャッシュします。自動取得中の名簿は画面の再読込時に更新します。手動編集・予備名簿の取り込み後は保存済み名簿を優先します。変更は「名簿を管理」で行えます。PvPランクは配信されません。
+              。一覧は15分、公開名簿は30分キャッシュします。自動取得中の名簿は画面の再読込時に更新します。手動編集・予備名簿の取り込み後は保存済み名簿を優先します。変更は「名簿を管理」で行えます。PvPランクは元サイトのメンバー情報から、同名が1人だけの人に限って補完します。手動で設定した値が優先され、補完できない人にはPvPを表示しません。
             </p>
             <p>
               ゲーム情報が最新とは限りません。ギルド一覧の取得が停止しても、保存済み・手動登録のギルドと名簿で攻撃チェックを継続できます。
