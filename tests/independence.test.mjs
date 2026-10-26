@@ -118,7 +118,8 @@ test("brand-new installation works fully offline; names can change without losin
     assert.equal((await r.json()).members[0].userName, "新しい名前");
     r = await fetch(base + `/api/guilds/${gid}/checks?week=2026-10-23`);
     assert.equal((await r.json()).states[member.uid]["2026-10-23"][2], true);
-    assert.ok(requests.every((url) => !url.includes("onrender.com")));
+    // The only closed-site request allowed is the optional PvP reference member list.
+    assert.ok(requests.every((url) => !url.includes("onrender.com") || url.startsWith("https://rangers-api-3mfw.onrender.com/api/guild-member-info/")));
     // A consistent SQLite backup includes rosters, registry, and attack records.
     const db = new DatabaseSync(path, { readOnly: true });
     await backup(db, join(dir, "backup.sqlite"));

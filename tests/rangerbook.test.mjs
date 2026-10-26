@@ -43,6 +43,7 @@ test("existing IDs survive updates; renames get new IDs; ambiguous duplicates ca
   assert.deepEqual(reconcileRoster(duplicate, [{ name: "名前", level: 400 }, { name: "名前", level: 499 }]).data, duplicate);
 });
 
+const isReferencePvp = (url) => url.startsWith("https://rangers-api-3mfw.onrender.com/api/guild-member-info/");
 test("public sync preserves checks, caches tier data, and survives outage without the closing API", async () => {
   const store = openStore(":memory:"); const requests = [];
   try {
@@ -51,18 +52,19 @@ test("public sync preserves checks, caches tier data, and survives outage withou
     const sources = createSources(store, {}, async (url, options) => {
       requests.push(url);
       if (url === RANKING_URL) return ranking();
+      if (isReferencePvp(url)) return { members: [] };
       assert.equal(options.compactGuilds, true);
       assert.equal(url, `${RANGERBOOK_BASE}/guildwar_data_LEGEND.json`);
       return snapshot();
     });
     assert.equal((await sources.members("guild1")).mode, "manual");
-    assert.equal(requests.length, 0);
+    assert.equal(requests.filter((url) => !isReferencePvp(url)).length, 0);
     const synced = await sources.syncMembers("guild1");
     assert.equal(synced.mode, "rangerbook");
     assert.equal(synced.data[0].uid, "stable");
     assert.equal(synced.data[0].level, 500);
     await sources.members("guild1");
-    assert.equal(requests.length, 2);
+    assert.equal(requests.filter((url) => !isReferencePvp(url)).length, 2);
     assert.equal(store.getChecks("guild1", "ally", "2026-10-21", "2026-10-25").stable["2026-10-23"][2], true);
     const offline = createSources(store, {}, async () => { throw new Error("offline"); });
     store.putCache("rangerbook-ranking", ranking(), RANKING_URL);
@@ -72,7 +74,7 @@ test("public sync preserves checks, caches tier data, and survives outage withou
     assert.equal(result.stale, true);
     assert.equal(result.data[0].uid, "stable");
     assert.equal(result.fetchedAt, synced.fetchedAt);
-    assert.ok(requests.every((url) => !url.includes("onrender.com")));
+    assert.ok(requests.every((url) => !url.includes("onrender.com") || isReferencePvp(url)));
   } finally { store.close(); }
 });
 
