@@ -311,11 +311,14 @@ function App() {
     }
     const controller = new AbortController();
     setPvpLoading(true);
-    api(`/api/guilds/${gid}/pvp${refresh ? "?refresh=1" : ""}`, { signal: controller.signal })
+    api(`/api/guilds/${gid}/pvp?refresh=1`, { signal: controller.signal })
       .then((result) => {
         if (!controller.signal.aborted) {
+          if (result.stale) {
+            setPvpWarning("取得元に接続できず、最新のランクを確認できませんでした。更新ボタンから再試行できます。");
+            return;
+          }
           setPvpReference({ gid, members: normalizeReferenceMembers(result.members), fetchedAt: result.fetchedAt });
-          if (result.stale) setPvpWarning("前回取得したPvPランクを表示しています。");
         }
       })
       .catch((error) => {
