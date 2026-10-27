@@ -2,12 +2,15 @@ import { validId, weekDates } from "./domain.mjs";
 export const privateKey = (gid) => `guildwar-private-checks:${gid}`;
 export function loadPrivateBoard(storage, gid, week) {
   const raw = storage.getItem(privateKey(gid));
-  if (!raw) return { states: {}, exists: false };
+  if (!raw) return { states: {}, results: [{}, {}], exists: false };
   const data = JSON.parse(raw);
-  return { states: data.week === week && data.states && typeof data.states === "object" && !Array.isArray(data.states) ? data.states : {}, exists: true };
+  const sameWeek = data.week === week;
+  const results = sameWeek && Array.isArray(data.results) && data.results.length === 2 ? data.results : [{}, {}];
+  return { states: sameWeek && data.states && typeof data.states === "object" && !Array.isArray(data.states) ? data.states : {}, results, exists: true };
 }
-export function savePrivateBoard(storage, gid, week, states) {
-  storage.setItem(privateKey(gid), JSON.stringify({ week, states }));
+export function savePrivateBoard(storage, gid, week, states, results) {
+  const savedResults = results ?? loadPrivateBoard(storage, gid, week).results;
+  storage.setItem(privateKey(gid), JSON.stringify({ week, states, results:savedResults }));
 }
 export function checkedEntries(states, members, dates) {
   const entries = [];
