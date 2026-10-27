@@ -160,12 +160,15 @@ function App() {
     [page, setPage] = useState(1),
     [rankSort, setRankSort] = useState({ key: "lastGuildWarRank", dir: 1 });
   const [rankEditor, setRankEditor] = useState(null);
+  const [attackEditor, setAttackEditor] = useState(null);
   const [rankError, setRankError] = useState("");
   const [pvpReference, setPvpReference] = useState({ gid: "", members: [] }),
     [pvpLoading, setPvpLoading] = useState(false),
     [pvpWarning, setPvpWarning] = useState("");
   const rankDialog = useRef(null);
+  const attackDialog = useRef(null);
   useEffect(() => { if (rankEditor) rankDialog.current?.showModal(); }, [rankEditor?.uid]);
+  useEffect(() => { if (attackEditor) attackDialog.current?.showModal(); }, [attackEditor]);
   const [editingRoster, setEditingRoster] = useState(false),
     [registerGuild, setRegisterGuild] = useState(false);
   const [token] = useState(
@@ -206,7 +209,7 @@ function App() {
     window.addEventListener("focus", updateGameDate);
     document.addEventListener("visibilitychange", updateGameDate);
     const refreshData = setInterval(() => {
-      if (!document.hidden && !busy.current && !editingRoster && !rankEditor) setRefresh((n) => n + 1);
+      if (!document.hidden && !busy.current && !editingRoster && !rankEditor && !attackEditor) setRefresh((n) => n + 1);
     }, 300000);
     return () => {
       clearInterval(t);
@@ -214,7 +217,7 @@ function App() {
       window.removeEventListener("focus", updateGameDate);
       document.removeEventListener("visibilitychange", updateGameDate);
     };
-  }, [editingRoster, rankEditor]);
+  }, [editingRoster, rankEditor, attackEditor]);
   useEffect(() => {
     const c = new AbortController();
     setGuildLoading(true);
@@ -267,6 +270,7 @@ function App() {
     setRoster(null);
     setEditingRoster(false);
     setRankEditor(null);
+    setAttackEditor(null);
     if (!gid) { setRosterLoading(false); return () => c.abort(); }
     setRosterLoading(true);
     async function readChecks() {
@@ -428,7 +432,7 @@ function App() {
     setSaving(true);
     setRankError("");
     try {
-      const latest = await api(`/api/guilds/${gid}/members`);
+      const latest = await api(`/api/guilds/${gid}/members?include_pvp=0`);
       if (seq !== generation.current) return;
       if (!latest.members.some((m) => m.uid === rankEditor.uid)) throw new Error("このメンバーは名簿から削除されています。");
       const updated = latest.members.map((m) => m.uid === rankEditor.uid ? { ...m, pvpLeaguePhase: rankEditor.rank } : m);
@@ -651,6 +655,19 @@ function App() {
         </div>
       </aside>
       <div className="workspace">
+        {attackEditor && <dialog ref={attackDialog} className="rank-dialog attack-dialog" aria-labelledby="attack-dialog-title" onCancel={() => setAttackEditor(null)} onClick={(event) => { if (event.target === event.currentTarget) setAttackEditor(null); }}>
+          <h2 id="attack-dialog-title">{attackEditor.name}</h2>
+          <p>{attackEditor.day.slice(5).replace("-", "/")}・{attackEditor.slot}回目の結果</p>
+          <div className="attack-dialog-choices">
+            {[ ["win", "○", "勝ち"], ["loss", "×", "負け"] ].map(([value, symbol, label]) => <button key={value} type="button" className={`attack-choice choice-${value}`} aria-pressed={resultAt(results, attackEditor.uid, attackEditor.day, attackEditor.slot) === value} onClick={() => {
+              const { uid, day, slot } = attackEditor;
+              const next = checked(states, uid, day, slot) && resultAt(results, uid, day, slot) === value ? null : value;
+              setAttackEditor(null); setFilterDay(day); save(uid, day, slot, next);
+            }}><strong aria-hidden="true">{symbol}</strong><span>{label}</span></button>)}
+          </div>
+          <p className="attack-dialog-hint">同じ結果をもう一度押すと記録を取り消せます。</p>
+          <button type="button" className="text-button" onClick={() => setAttackEditor(null)}>閉じる</button>
+        </dialog>}
         {rankEditor && <dialog ref={rankDialog} className="rank-dialog" onCancel={(e) => { if (saving) e.preventDefault(); else setRankEditor(null); }}>
           <form onSubmit={saveMemberRank}>
             <h2>{rankEditor.name}</h2>
@@ -707,7 +724,7 @@ function App() {
             <button
               className="button secondary refresh"
               onClick={() => setRefresh((n) => n + 1)}
-              disabled={guildLoading || rosterLoading || saving || editingRoster || Boolean(rankEditor)}
+              disabled={guildLoading || rosterLoading || saving || editingRoster || Boolean(rankEditor) || Boolean(attackEditor)}
             >
               <Icon name="refresh" size={17} />
               更新
@@ -744,7 +761,7 @@ function App() {
               <section id="checker-options-panel" className="panel checker-options-panel">
                 <div className="checker-actions">
                   <button className="button" onClick={() => setView("ranking")}>ランキング</button>
-                  <button className="button" onClick={() => setRefresh((n) => n + 1)} disabled={guildLoading || rosterLoading || saving || editingRoster || Boolean(rankEditor)}>更新</button>
+                  <button className="button" onClick={() => setRefresh((n) => n + 1)} disabled={guildLoading || rosterLoading || saving || editingRoster || Boolean(rankEditor) || Boolean(attackEditor)}>更新</button>
                   <button className="button" onClick={() => share(false)} disabled={!gid || saving || rosterLoading || (!sharing && !results)}>{sharing ? "この共有リンクをコピー" : "共有リンクを作成"}</button>
                   {sharing && <button className="button" onClick={() => share(true)} disabled={!gid || saving || rosterLoading || !results}>新しい共有リンクを作成</button>}
                   {members.length > 0 && <button className="button" disabled={saving || rosterLoading} onClick={() => setEditingRoster(true)}>名簿を管理</button>}
@@ -881,7 +898,7 @@ function App() {
                                         attacked={checked(states, m.uid, d, slot)}
                                         result={resultAt(results, m.uid, d, slot)}
                                         disabled={saving || !results}
-                                        onChange={(value) => { setFilterDay(d); save(m.uid, d, slot, value); }}
+                                        onOpen={() => setAttackEditor({uid:m.uid, name:m.userName, day:d, slot})}
                                       />
                                     </td>
                                   )))}
@@ -1104,4 +1121,5 @@ function App() {
   );
 }
 createRoot(document.getElementById("root")).render(<App />);
+
 

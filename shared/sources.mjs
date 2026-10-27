@@ -250,7 +250,14 @@ export function createSources(store, config = {}, requestJSON) {
   };
   return {
     ...sources,
-    syncMembers: async (gid) => withPvpReference(gid, await syncMembers(gid)),
-    members: async (gid) => withPvpReference(gid, await sources.members(gid)),
+    syncMembers: async (gid, { includePvp = true } = {}) => {
+      const roster = await syncMembers(gid);
+      return includePvp ? withPvpReference(gid, roster) : roster;
+    },
+    members: async (gid, { includePvp = true } = {}) => {
+      const roster = await sources.members(gid);
+      return includePvp ? withPvpReference(gid, roster) : roster;
+    },
   };
 }
+
