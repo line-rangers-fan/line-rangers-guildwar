@@ -303,7 +303,6 @@ function App() {
     };
   }, [gid, team, week, refresh, sharing]);
   useEffect(() => {
-    setPvpReference({ gid: "", members: [] });
     setPvpWarning("");
     if (view !== "checker" || !gid || gid.startsWith("local-")) {
       setPvpLoading(false);
@@ -315,14 +314,13 @@ function App() {
       .then((result) => {
         if (!controller.signal.aborted) {
           if (result.stale) {
-            setPvpWarning("取得元に接続できず、最新のランクを確認できませんでした。更新ボタンから再試行できます。");
-            return;
+            setPvpWarning("最新のランクを確認できないため、前回取得したランクを表示しています。");
           }
           setPvpReference({ gid, members: normalizeReferenceMembers(result.members), fetchedAt: result.fetchedAt });
         }
       })
       .catch((error) => {
-        if (!controller.signal.aborted && error.name !== "AbortError") setPvpWarning("PvPランクを取得できませんでした。更新ボタンから再試行できます。");
+        if (!controller.signal.aborted && error.name !== "AbortError") setPvpWarning("PvPランクを更新できませんでした。取得済みのランクがあれば引き続き表示します。");
       })
       .finally(() => { if (!controller.signal.aborted) setPvpLoading(false); });
     return () => controller.abort();

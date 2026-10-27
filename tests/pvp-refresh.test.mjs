@@ -35,3 +35,27 @@ test("failed forced refresh is marked stale and uncached failures are explicit",
     await assert.rejects(source.pvpMembers("uncached", true), /offline/);
   } finally { store.close(); }
 });
+
+test("PvP endpoint returns the previous ranks when a refresh fails", async () => {
+  const store = openStore(":memory:");
+  let online = true;
+  const sources = createSources(store, {}, async () => {
+    if (!online) throw new Error("offline");
+    return { members: [{ userName: "A", pvpLeaguePhase: "GOLD_1" }] };
+  });
+  const server = createApp({ store, sources }).listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  const url = `http://127.0.0.1:${server.address().port}/api/guilds/guild1/pvp?refresh=1`;
+  try {
+    await fetch(url);
+    online = false;
+    const response = await fetch(url);
+    const result = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(result.stale, true);
+    assert.equal(result.members[0].pvpLeaguePhase, "GOLD_1");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    store.close();
+  }
+});
