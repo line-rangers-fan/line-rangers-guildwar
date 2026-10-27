@@ -54,7 +54,7 @@ export function resetPersonal(storage) {
   const keys = [];
   for (let i = 0; i < storage.length; i++) {
     const key = storage.key(i);
-    if (key === PREFERENCES_KEY || key === "guildwar-selection" || key?.startsWith("guildwar-private-checks:")) keys.push(key);
+    if (key === PREFERENCES_KEY || key === "guildwar-selection" || (key?.startsWith("guildwar-private-checks:") || key?.startsWith("guildwar-personal-roster:"))) keys.push(key);
   }
   for (const key of keys) storage.removeItem(key);
 }

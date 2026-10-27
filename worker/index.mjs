@@ -1,4 +1,5 @@
 import { createD1Store } from "./store.mjs";
+import { boardAction } from "../shared/isolated-board.mjs";
 import { directoryGuilds } from "../shared/personal.mjs";
 import { validateShare } from "../shared/boards.mjs";
 import { trustedOrigin, corsHeaders } from "../shared/cors.mjs";
@@ -98,6 +99,14 @@ export function createWorkerHandler(makeStore = createD1Store) {
             throw new Error("invalid input");
           return JSON.parse(text);
         }
+        if (["/api/boards", "/api/boards/check", "/api/boards/roster"].includes(path)) {
+          try {
+            const action = path.endsWith('/check') ? 'check' : path.endsWith('/roster') ? 'roster' : request.method === 'POST' ? 'create' : 'board';
+            const input = request.method === 'GET' ? {week:url.searchParams.get('week')} : await body();
+            const result = await boardAction(store, request.headers.get('x-board-key'), request.method, action, input);
+            return json(result.body, result.status);
+          } catch { return json({error:'共有データの形式が正しくありません'}, 400); }
+        }
         if (path === "/api/guild-tiers" && request.method === "GET") {
           const r = await sources.guildTiers();
           return json({ tiers: r.data, fetchedAt: r.observedAt || r.fetchedAt, stale: r.stale, warning: r.warning });
@@ -141,7 +150,7 @@ export function createWorkerHandler(makeStore = createD1Store) {
         );
         if (!match) return json({ error: "APIが見つかりません" }, 404);
         const [, gid, action] = match;
-        if (!validId(gid))
+        if (!validId(gid) || gid.startsWith("board-"))
           return json({ error: "ギルドIDが正しくありません" }, 400);
         if (action === "pvp" && request.method === "GET") {
           try {

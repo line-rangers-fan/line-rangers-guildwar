@@ -1,5 +1,12 @@
 export function createD1Store(db) {
   return {
+    async createIsolatedBoard(id, gid, members, entries) {
+      const now = new Date().toISOString();
+      const statements = [db.prepare("INSERT INTO isolated_boards VALUES(?,?,?,?)").bind(id,gid,JSON.stringify(members),now), ...entries.map(e=>db.prepare("INSERT INTO checks VALUES(?,?,?,?,?,?,?)").bind(id,"ally",e.uid,e.day,e.slot,1,now))];
+      try { await db.batch(statements); return true; } catch (e) { if (await this.getIsolatedBoard(id)) return false; throw e; }
+    },
+    async getIsolatedBoard(id) { const r=await db.prepare("SELECT gid,payload FROM isolated_boards WHERE id=?").bind(id).first(); return r ? {gid:r.gid,members:JSON.parse(r.payload)} : null; },
+    async putIsolatedRoster(id, members) { await db.prepare("UPDATE isolated_boards SET payload=? WHERE id=?").bind(JSON.stringify(members),id).run(); },
     async listLocalGuilds() {
       return (
         await db.prepare("SELECT payload FROM local_guilds ORDER BY gid").all()

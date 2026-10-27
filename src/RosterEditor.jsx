@@ -1,7 +1,6 @@
-import { apiURL } from "./runtime.mjs";
 import React, { useState } from "react";
 import { LEAGUES } from "../shared/domain.mjs";
-export function RosterEditor({ gid, members, token, onSaved, onClose }) {
+export function RosterEditor({ gid, members, token, onSaved, onClose, saveRoster }) {
   const [draft, setDraft] = useState(() => members.map((m) => ({ ...m }))),
     [error, setError] = useState(""),
     [saving, setSaving] = useState(false),
@@ -53,16 +52,7 @@ export function RosterEditor({ gid, members, token, onSaved, onClose }) {
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(apiURL(`/api/guilds/${gid}/roster`), {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ members: draft }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
+      const data = await saveRoster(draft);
       onSaved(data);
     } catch (e) {
       setError(e.message);

@@ -1,4 +1,5 @@
 import express from "express";
+import { boardAction } from "../shared/isolated-board.mjs";
 import { directoryGuilds } from "../shared/personal.mjs";
 import { validateShare } from "../shared/boards.mjs";
 import { trustedOrigin, corsHeaders } from "../shared/cors.mjs";
@@ -40,7 +41,7 @@ export function createApp({
     }),
   );
   const params = (req, res, next) => {
-    if (!validId(req.params.gid)) {
+    if (!validId(req.params.gid) || req.params.gid.startsWith("board-")) {
       res.status(400).json({ error: "ギルドIDが正しくありません" });
       return;
     }
@@ -64,6 +65,18 @@ export function createApp({
         .json({ error: "設定から保存用キーを入力してください" });
     next();
   };
+  app.all(["/api/boards", "/api/boards/check", "/api/boards/roster"], async (req, res, next) => {
+    if (!["GET", "POST", "PUT"].includes(req.method)) return res.status(405).end();
+    if (req.method !== "GET") return authorizeWrite(req, res, () => run());
+    return run();
+    async function run() {
+      try {
+        const action = req.path.endsWith('/check') ? 'check' : req.path.endsWith('/roster') ? 'roster' : req.method === 'POST' ? 'create' : 'board';
+        const result = await boardAction(store, req.get('x-board-key'), req.method, action, req.method === 'GET' ? {week:req.query.week} : req.body);
+        res.status(result.status).json(result.body);
+      } catch { res.status(400).json({error:'共有データの形式が正しくありません'}); }
+    }
+  });
   app.post("/api/guilds", authorizeWrite, (req, res) => {
     const { name, nationalFlag = "" } = req.body || {};
     if (
