@@ -1,8 +1,9 @@
 import { LEAGUES } from "./domain.mjs";
-// The closing reference site's member list is used only to fill PvP ranks for
+// The reference site's member list supplies the displayed PvP ranks for
 // display and sorting. It is never saved into the roster.
 export const REFERENCE_MEMBERS_URL = "https://rangers-api-3mfw.onrender.com/api/guild-member-info/{gid}/members";
 export const REFERENCE_MAX_AGE = 6 * 60 * 60 * 1000;
+export const displayedPvpRank = (member) => member.pvpReferenceChecked ? (member.pvpReference || "") : (member.pvpLeaguePhase || member.pvpReference || "");
 export function normalizeReferenceMembers(input) {
   const members = Array.isArray(input) ? input : input?.members;
   if (!Array.isArray(members) || members.length > 100) throw new Error("PvP参照名簿の形式が変わっています");
@@ -18,7 +19,7 @@ export function withReferencePvp(members, reference) {
   const ours = counts(members), theirs = counts(reference);
   const leagues = new Map(reference.filter((r) => r.pvpLeaguePhase && theirs.get(r.userName) === 1).map((r) => [r.userName, r.pvpLeaguePhase]));
   return members.map((m) => {
-    const pvpReference = !m.pvpLeaguePhase && ours.get(m.userName) === 1 ? leagues.get(m.userName) : "";
-    return pvpReference ? { ...m, pvpReference } : m;
+    const pvpReference = ours.get(m.userName) === 1 ? leagues.get(m.userName) : "";
+    return { ...m, pvpReference: pvpReference || "", pvpReferenceChecked: true };
   });
 }

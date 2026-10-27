@@ -19,7 +19,7 @@ import { loadGuildDirectory } from "./public-directory.mjs";
 import { AttackControl } from "./AttackControl.jsx";
 import { PREFERENCES_KEY, loadPersonal, initialChoice, resetPersonal } from "../shared/personal.mjs";
 import { RosterEditor, GuildRegistration } from "./RosterEditor.jsx";
-import { normalizeReferenceMembers, withReferencePvp } from "../shared/pvp.mjs";
+import { normalizeReferenceMembers, withReferencePvp, displayedPvpRank } from "../shared/pvp.mjs";
 
 function Icon({ name, size = 20, ...props }) {
   const paths = {
@@ -311,10 +311,10 @@ function App() {
     }
     const controller = new AbortController();
     setPvpLoading(true);
-    api(`/api/guilds/${gid}/pvp`, { signal: controller.signal })
+    api(`/api/guilds/${gid}/pvp${refresh ? "?refresh=1" : ""}`, { signal: controller.signal })
       .then((result) => {
         if (!controller.signal.aborted) {
-          setPvpReference({ gid, members: normalizeReferenceMembers(result.members) });
+          setPvpReference({ gid, members: normalizeReferenceMembers(result.members), fetchedAt: result.fetchedAt });
           if (result.stale) setPvpWarning("前回取得したPvPランクを表示しています。");
         }
       })
@@ -716,6 +716,7 @@ function App() {
                     <span className="checklist-summary">{!registeredGuilds.some((g) => g.gid === gid) && guild && <button className="text-button" onClick={() => registerPersonal(guild)}>自分に登録</button>}<span>{currentDay.slice(5).replace("-", "/")} 残り <b>{rosterLoading || rosterUnavailable ? "—" : dayRemaining}</b>回</span></span>
                   </div>
                   {pvpWarning && <div className="alert warning" role="status">{pvpWarning}</div>}
+                  {pvpReference.gid === gid && pvpReference.fetchedAt && <p className="personal-note">ランク取得 {dateText(pvpReference.fetchedAt)} · 照合 {members.filter((m) => displayedPvpRank(m)).length}/{members.length}人</p>}
                   {roster?.publicObservedAt && <p className="personal-note">公開名簿の更新日時：{dateText(roster.publicObservedAt)} JST{roster.publicIncomplete ? ` ／ 配信済み${members.length}人・公称${roster.reportedMemberCount}人` : ""}</p>}
                   {!rosterLoading && roster && members.length === 0 && <button className="button" onClick={() => setEditingRoster(true)}>メンバーを登録</button>}
                   {editingRoster && (
@@ -812,7 +813,7 @@ function App() {
                                     <span className="member-identity">
                                       <button type="button" className="member-rank-button" disabled={saving} title={m.userName} onClick={() => { setRankError(""); setRankEditor({ uid: m.uid, name: m.userName, rank: m.pvpLeaguePhase || "" }); }} aria-label={`${m.userName}のPvPランク帯を設定`}><span className="member-name-text">{m.userName}</span></button>
                                       <small className="sort-level">{levelLabel(m.level)}</small>
-                                      <span className="member-pvp" aria-label={`PvPランク ${m.pvpLeaguePhase || m.pvpReference ? pvpRankText(m.pvpLeaguePhase || m.pvpReference) : pvpLoading ? "取得中" : "未取得"}`} title={m.pvpLeaguePhase || m.pvpReference ? pvpRankText(m.pvpLeaguePhase || m.pvpReference) : "PvPランク未取得"}>{m.pvpLeaguePhase || m.pvpReference ? leagueLabel(m.pvpLeaguePhase || m.pvpReference) : pvpLoading ? "…" : "—"}</span>
+                                      <span className="member-pvp" aria-label={`PvPランク ${displayedPvpRank(m) ? pvpRankText(displayedPvpRank(m)) : pvpLoading ? "取得中" : "未取得"}`} title={displayedPvpRank(m) ? pvpRankText(displayedPvpRank(m)) : "PvPランク未取得"}>{displayedPvpRank(m) ? leagueLabel(displayedPvpRank(m)) : pvpLoading ? "…" : "—"}</span>
                                     </span>
                                   </th>
                                   {dates.flatMap((d) => [1, 2].map((slot) => (
@@ -1006,7 +1007,7 @@ function App() {
                   JST
                 </>
               )}
-              。一覧は15分、公開名簿は30分キャッシュします。自動取得中の名簿は画面の再読込時に更新します。手動編集・予備名簿の取り込み後は保存済み名簿を優先します。変更は「名簿を管理」で行えます。PvPランクは元サイトのメンバー情報から、同名が1人だけの人に限って補完します。手動で設定した値が優先され、補完できない人にはPvPを表示しません。
+              。一覧は15分、公開名簿は30分キャッシュします。自動取得中の名簿は画面の再読込時に更新します。手動編集・予備名簿の取り込み後は保存済み名簿を優先します。変更は「名簿を管理」で行えます。PvPランクは元サイトのメンバー情報から、同名が1人だけの人に限って照合します。表示と並び順は取得元のランクを優先し、照合できない人は未取得にします。
             </p>
             <p>
               ゲーム情報が最新とは限りません。ギルド一覧の取得が停止しても、保存済み・手動登録のギルドと名簿で攻撃チェックを継続できます。

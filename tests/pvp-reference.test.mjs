@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeReferenceMembers, withReferencePvp } from "../shared/pvp.mjs";
+import { normalizeReferenceMembers, withReferencePvp, displayedPvpRank } from "../shared/pvp.mjs";
 import { memberComparator } from "../shared/personal.mjs";
 import { leagueLabel } from "../shared/domain.mjs";
 import { openStore } from "../server/store.mjs";
@@ -21,19 +21,27 @@ const roster = [
   { uid: "d", userName: "次郎", level: 150, pvpLeaguePhase: "" },
   { uid: "e", userName: "三郎", level: 120, pvpLeaguePhase: "" },
 ];
-test("reference PvP fills only unique unset names and keeps manual values", () => {
+test("reference PvP replaces displayed stale values while preserving stored fields", () => {
   const result = withReferencePvp(roster, reference);
   assert.equal(result[0].pvpReference, "DIAMOND_1");
   assert.equal(result[1].pvpLeaguePhase, "MASTER_2");
-  assert.equal(result[1].pvpReference, undefined);
-  assert.equal(result[2].pvpReference, undefined, "same-name players are never guessed");
-  assert.equal(result[3].pvpReference, undefined, "unknown league names are ignored");
-  assert.equal(result[4].pvpReference, undefined, "names absent from the reference stay blank");
+  assert.equal(result[1].pvpReference, "GOLD_2");
+  assert.equal(displayedPvpRank(result[1]), "GOLD_2");
+  assert.equal(result[2].pvpReference, "", "same-name players are never guessed");
+  assert.equal(result[3].pvpReference, "", "unknown league names are ignored");
+  assert.equal(result[4].pvpReference, "", "names absent from the reference stay blank");
   assert.equal(roster[0].pvpReference, undefined, "input rows are not mutated");
 });
 test("reference ranks sort with the same PvP order as manual ranks", () => {
   const order = withReferencePvp(roster, reference).sort(memberComparator({ key: "pvp", dir: -1 })).map((m) => m.uid);
-  assert.deepEqual(order, ["b", "a", "d", "e", "c"]);
+  assert.deepEqual(order, ["a", "b", "d", "e", "c"]);
+});
+test("missing and ambiguous reference ranks never display old saved values", () => {
+  const saved = [{ uid: "old", userName: "Missing", level: 100, pvpLeaguePhase: "LEGEND" }, { uid: "dup", userName: "Duplicate", level: 100, pvpLeaguePhase: "MASTER_1" }];
+  const result = withReferencePvp(saved, [{ userName: "Duplicate", pvpLeaguePhase: "GOLD_1" }, { userName: "Duplicate", pvpLeaguePhase: "SILVER_1" }]);
+  assert.deepEqual(result.map(displayedPvpRank), ["", ""]);
+  assert.equal(saved[0].pvpLeaguePhase, "LEGEND");
+  assert.deepEqual(result.map((m) => m.uid), ["old", "dup"]);
 });
 test("reference format changes are rejected instead of partially trusted", () => {
   assert.throws(() => normalizeReferenceMembers({ members: "changed" }));

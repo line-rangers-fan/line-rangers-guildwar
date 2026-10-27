@@ -1,4 +1,5 @@
 import { validId, LEAGUES } from "./domain.mjs";
+import { displayedPvpRank } from "./pvp.mjs";
 export const PREFERENCES_KEY = "guildwar-personal-v1";
 export const DEFAULT_SORT = { key: "level", dir: -1 };
 export function directoryGuilds(input, limit = 200) {
@@ -35,7 +36,7 @@ export function memberComparator(sort) {
     const byLevel = Number(b.level || 0) - Number(a.level || 0);
     if (sort.key === "pvp") {
       const rank = (member) => {
-        const index = LEAGUES.indexOf(member.pvpLeaguePhase || member.pvpReference);
+        const index = LEAGUES.indexOf(displayedPvpRank(member));
         return index < 0 ? LEAGUES.length : index;
       };
       return rank(a) - rank(b) || byLevel || name || a.uid.localeCompare(b.uid);
