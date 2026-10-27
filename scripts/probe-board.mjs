@@ -1,15 +1,15 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { normalizeReferenceMembers } from '../shared/pvp.mjs';
-const ids=['6c35405090b34adb91b4f1756f0c2c21','2a872d4e95f140f53f1af2f304784c56','b5cd37f613687f622d5c510ab611c54e'];
-await mkdir('pvp-snapshot/pvp-cache',{recursive:true});
-const outcome=await Promise.all(ids.map(async gid=>{
- try {
-  const response=await fetch('https://rangers-api-3mfw.onrender.com/api/guild-member-info/'+gid+'/members',{signal:AbortSignal.timeout(30000)});
-  if(!response.ok) throw Error('HTTP '+response.status);
-  const members=normalizeReferenceMembers(await response.json());
-  if(!members.length) throw Error('empty');
-  await writeFile('pvp-snapshot/pvp-cache/'+gid+'.json',JSON.stringify({version:1,gid,fetchedAt:new Date().toISOString(),members}));
-  return 'ok';
- } catch(e) {console.log('retry',gid,e.message);return 'failed';}
-}));
-console.log('retry success',outcome.filter(x=>x==='ok').length,'of',ids.length);
+import assert from 'node:assert/strict';
+const root='https://line-rangers-fan.github.io/line-rangers-guildwar/';
+const htmlResponse=await fetch(root,{signal:AbortSignal.timeout(30000),cache:'no-store'});
+assert.equal(htmlResponse.status,200);
+const html=await htmlResponse.text();
+const match=html.match(/src="([^"]*assets\\/app\\.js[^"]*)"/);
+assert.ok(match,'app JS entry');
+const jsResponse=await fetch(new URL(match[1],root),{signal:AbortSignal.timeout(30000),cache:'no-store'});
+assert.equal(jsResponse.status,200);
+const bundle=await jsResponse.text();
+assert.ok(bundle.includes('guildwar-results-v1'),'result storage code is published');
+assert.ok(bundle.includes('data/pvp/'),'weekly PvP cache code is published');
+const data=await fetch(new URL('data/pvp/62848e3ce5804aa985513a7922ff87b2.json',root),{signal:AbortSignal.timeout(30000),cache:'no-store'});
+assert.equal(data.status,200);const json=await data.json();assert.equal(json.gid,'62848e3ce5804aa985513a7922ff87b2');assert.ok(json.members.length>0);
+console.log('PASS published bundle and snapshot:',json.members.length,'members, fetchedAt',json.fetchedAt);
