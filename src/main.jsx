@@ -12,10 +12,10 @@ import {
 import "./style.css";
 import "./compact.css";
 import { apiURL, pagePath, publicBoardURL, transferToPublicSite, transferMessage } from "./runtime.mjs";
-import { loadPrivateBoard, savePrivateBoard, checkedEntries } from "../shared/boards.mjs";
+import { loadPrivateBoard, savePrivateBoard } from "../shared/boards.mjs";
 import { groupMembers } from "../shared/checklist.mjs";
 import { resultAt, setResult, resultSummary } from "../shared/results.mjs";
-import { readSharedResults, writeSharedResult, copySharedResults } from "./results-api.mjs";
+import { readSharedResults, writeSharedResult } from "./results-api.mjs";
 import { loadRosterWithFallback } from "./public-roster.mjs";
 import { loadGuildDirectory } from "./public-directory.mjs";
 import { AttackControl } from "./AttackControl.jsx";
@@ -537,8 +537,7 @@ function App() {
     try {
       if (!sharing || createNew) {
         const key = Array.from(crypto.getRandomValues(new Uint8Array(32)), b=>b.toString(16).padStart(2,'0')).join('');
-        const result = await boardApi('/api/boards', {method:'POST',headers:{'Content-Type':'application/json','x-board-key':key},body:JSON.stringify({gid,members:roster.members,week,entries:checkedEntries(states,roster.members,dates)})});
-        await copySharedResults({api:boardApi, gid, boardKey:key, week, members:roster.members, dates, states, results});
+        const result = await boardApi('/api/boards', {method:'POST',headers:{'Content-Type':'application/json','x-board-key':key},body:JSON.stringify({gid,members:roster.members,week,entries:[]})});
         if (seq !== generation.current) return;
         setBoardKey(key); setSharing(true); setStates(result.states);
         url.hash = `board=${key}`;
@@ -773,7 +772,7 @@ function App() {
                     {personalGuilds.map((g) => <option key={g.gid} value={g.gid}>{g.name}</option>)}
                   </select>
                 </label>
-                {sharing && <p className="personal-note">{boardKey ? "このリンクを知っている人がチェックを編集できます。新しい共有リンクを作成すると、現在のチェックをコピーした別の表になります。" : "以前の共有リンクです。同じギルドの旧リンクとチェックが共有されます。新しい共有リンクを作成すると別の表になります。"}</p>}
+                {sharing && <p className="personal-note">{boardKey ? "このリンクを知っている人がチェックを編集できます。新しい共有リンクを作成すると、チェック・勝敗が空の別の表になります。以前の共有リンクの記録は残ります。" : "以前の共有リンクです。同じギルドの旧リンクとチェックが共有されます。新しい共有リンクを作成すると、チェック・勝敗が空の別の表になります。"}</p>}
                 {shareFallback && <label className="share-url-field">LINEに貼り付ける共有URL<input aria-label="共有URL" readOnly value={shareFallback} onFocus={(e) => e.target.select()} /></label>}
                 <div className="personal-list-actions">
                 {personalGuilds.some((g) => g.gid === gid) && <button className="text-button" onClick={removePersonal}>選択中のギルドの登録を解除</button>}
