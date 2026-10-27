@@ -18,6 +18,7 @@ import { loadGuildDirectory } from "./public-directory.mjs";
 import { AttackControl } from "./AttackControl.jsx";
 import { PREFERENCES_KEY, loadPersonal, initialChoice, resetPersonal } from "../shared/personal.mjs";
 import { RosterEditor, GuildRegistration } from "./RosterEditor.jsx";
+import { normalizeReferenceMembers, withReferencePvp } from "../shared/pvp.mjs";
 
 function Icon({ name, size = 20, ...props }) {
   const paths = {
@@ -147,6 +148,9 @@ function App() {
     [rankSort, setRankSort] = useState({ key: "lastGuildWarRank", dir: 1 });
   const [rankEditor, setRankEditor] = useState(null);
   const [rankError, setRankError] = useState("");
+  const [pvpReference, setPvpReference] = useState([]),
+    [pvpLoading, setPvpLoading] = useState(false),
+    [pvpWarning, setPvpWarning] = useState("");
   const rankDialog = useRef(null);
   useEffect(() => { if (rankEditor) rankDialog.current?.showModal(); }, [rankEditor?.uid]);
   const [editingRoster, setEditingRoster] = useState(false),
@@ -298,6 +302,28 @@ function App() {
     };
   }, [gid, team, week, refresh, sharing]);
   useEffect(() => {
+    setPvpReference([]);
+    setPvpWarning("");
+    if (view !== "checker" || !gid || gid.startsWith("local-")) {
+      setPvpLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    setPvpLoading(true);
+    api(`/api/guilds/${gid}/pvp`, { signal: controller.signal })
+      .then((result) => {
+        if (!controller.signal.aborted) {
+          setPvpReference(normalizeReferenceMembers(result.members));
+          if (result.stale) setPvpWarning("前回取得したPvPランクを表示しています。");
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted && error.name !== "AbortError") setPvpWarning("PvPランクを取得できませんでした。更新ボタンから再試行できます。");
+      })
+      .finally(() => { if (!controller.signal.aborted) setPvpLoading(false); });
+    return () => controller.abort();
+  }, [gid, view, refresh]);
+  useEffect(() => {
     setPage(1);
   }, [country, search, rankLimit, rankSort, tier]);
   function announce(s) {
@@ -377,7 +403,7 @@ function App() {
   const guilds = useMemo(() => (guildResponse?.guilds || []).map((g) => ({ ...g, guildWarTier: tiersByGuild.get(g.gid)?.tier })), [guildResponse, tiersByGuild]);
   const personalGuilds = useMemo(() => registeredGuilds.filter((saved) => guilds.some((g) => g.gid === saved.gid) || directoryUnavailable && saved.lastGuildWarRank > 0 && saved.lastGuildWarRank <= 200).map((saved) => guilds.find((g) => g.gid === saved.gid) || saved), [guilds, registeredGuilds, directoryUnavailable]);
   const guild = guilds.find((g) => g.gid === gid) || personalGuilds.find((g) => g.gid === gid);
-  const members = roster?.members || [];
+  const members = useMemo(() => withReferencePvp(roster?.members || [], pvpReference), [roster, pvpReference]);
   const rosterUnavailable = !roster || (members.length === 0 && roster.needsSetup);
   const countryList = useMemo(
     () =>
@@ -688,6 +714,7 @@ function App() {
                     <h1>{guild?.name || "ギルド"} <small>{rosterLoading ? "取得中…" : rosterUnavailable ? "名簿未取得" : `${members.length}人`}</small></h1>
                     <span className="checklist-summary">{!registeredGuilds.some((g) => g.gid === gid) && guild && <button className="text-button" onClick={() => registerPersonal(guild)}>自分に登録</button>}<span>{currentDay.slice(5).replace("-", "/")} 残り <b>{rosterLoading || rosterUnavailable ? "—" : dayRemaining}</b>回</span></span>
                   </div>
+                  {pvpWarning && <div className="alert warning" role="status">{pvpWarning}</div>}
                   {roster?.publicObservedAt && <p className="personal-note">公開名簿の更新日時：{dateText(roster.publicObservedAt)} JST{roster.publicIncomplete ? ` ／ 配信済み${members.length}人・公称${roster.reportedMemberCount}人` : ""}</p>}
                   {!rosterLoading && roster && members.length === 0 && <button className="button" onClick={() => setEditingRoster(true)}>メンバーを登録</button>}
                   {editingRoster && (
@@ -782,7 +809,7 @@ function App() {
                                 <tr key={m.uid} className="member-row" data-member-id={m.uid}>
                                   <th scope="row" className="member-name">
                                     <button type="button" className="member-rank-button" disabled={saving} onClick={() => { setRankError(""); setRankEditor({ uid: m.uid, name: m.userName, rank: m.pvpLeaguePhase || "" }); }} aria-label={`${m.userName}のPvPランク帯を設定`}>{m.userName}</button><small className="sort-level">{levelLabel(m.level)}</small>
-                                    {(m.pvpLeaguePhase || m.pvpReference) && <span className="member-pvp" title={m.pvpLeaguePhase ? undefined : "元サイトのメンバー情報から補完"}>PvP {pvpRankText(m.pvpLeaguePhase || m.pvpReference)}</span>}
+                                    <span className="member-pvp" title={m.pvpLeaguePhase ? undefined : m.pvpReference ? "元サイトのメンバー情報から補完" : undefined}>PvP {m.pvpLeaguePhase || m.pvpReference ? pvpRankText(m.pvpLeaguePhase || m.pvpReference) : pvpLoading ? "取得中…" : "未取得"}</span>
                                   </th>
                                   {dates.flatMap((d) => [1, 2].map((slot) => (
                                     <td key={`${d}-${slot}`} className={d === currentDay ? "selected-day check-cell" : "check-cell"}>
