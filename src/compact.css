@@ -124,7 +124,8 @@ input.attack-check:disabled { cursor:wait; }
 .name-sort-heading { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
 .name-sort-heading select { width:auto; max-width:125px; min-height:28px; padding:3px 5px; font-size:11px; }
 .member-identity { display:flex; align-items:center; gap:4px; min-width:0; }
-.compact-checker .member-rank-button { display:block; flex:1 1 0; min-width:0; max-width:100%; background:none; border:0; padding:3px 0; min-height:30px; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.compact-checker .member-rank-button { display:block; flex:1 1 0; min-width:0; max-width:100%; background:none; border:0; padding:3px 0; min-height:30px; color:#111; font:inherit; text-align:left; cursor:pointer; }
+.compact-checker .member-rank-button:disabled { opacity:1; }
 .member-name-text { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; line-height:1.2; }
 .member-identity .sort-level { flex:none; margin-left:0; }
 .member-pvp { flex:none; min-width:2em; text-align:center; color:#315d75; background:#edf3f4; border-radius:4px; padding:1px 3px; font-size:10px; font-weight:600; line-height:1.4; white-space:nowrap; }
