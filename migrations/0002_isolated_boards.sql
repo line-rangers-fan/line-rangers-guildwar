@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS isolated_boards(id TEXT PRIMARY KEY, gid TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL);

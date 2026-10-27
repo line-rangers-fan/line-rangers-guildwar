@@ -7,7 +7,7 @@ export function corsHeaders(origin) {
   return origin === PUBLIC_ORIGIN ? {
     "Access-Control-Allow-Origin": PUBLIC_ORIGIN,
     "Access-Control-Allow-Methods": "GET, HEAD, POST, PUT, OPTIONS",
-    "Access-Control-Allow-Headers": "content-type, authorization",
+    "Access-Control-Allow-Headers": "content-type, authorization, x-board-key",
     "Access-Control-Max-Age": "600",
     "Vary": "Origin",
   } : {};

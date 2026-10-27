@@ -8,8 +8,21 @@ export function openStore(path) {
     CREATE TABLE IF NOT EXISTS checks(gid TEXT NOT NULL,team TEXT NOT NULL,uid TEXT NOT NULL,day TEXT NOT NULL,slot INTEGER NOT NULL CHECK(slot IN(1,2)), checked INTEGER NOT NULL CHECK(checked IN(0,1)),updated_at TEXT NOT NULL, PRIMARY KEY(gid,team,uid,day,slot));
     CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY,payload TEXT NOT NULL,source TEXT NOT NULL,fetched_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS local_guilds(gid TEXT PRIMARY KEY,payload TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS rosters(gid TEXT PRIMARY KEY,payload TEXT NOT NULL,mode TEXT NOT NULL,observed_at TEXT,updated_at TEXT NOT NULL);`);
+    CREATE TABLE IF NOT EXISTS rosters(gid TEXT PRIMARY KEY,payload TEXT NOT NULL,mode TEXT NOT NULL,observed_at TEXT,updated_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS isolated_boards(id TEXT PRIMARY KEY,gid TEXT NOT NULL,payload TEXT NOT NULL,created_at TEXT NOT NULL);`);
   return {
+    createIsolatedBoard(id, gid, members, entries) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const result = db.prepare("INSERT OR IGNORE INTO isolated_boards VALUES(?,?,?,?)").run(id, gid, JSON.stringify(members), new Date().toISOString());
+        if (!result.changes) { db.exec("ROLLBACK"); return false; }
+        const q = db.prepare("INSERT INTO checks VALUES(?,?,?,?,?,?,?)");
+        for (const e of entries) q.run(id, "ally", e.uid, e.day, e.slot, 1, new Date().toISOString());
+        db.exec("COMMIT"); return true;
+      } catch (e) { db.exec("ROLLBACK"); throw e; }
+    },
+    getIsolatedBoard(id) { const r=db.prepare("SELECT gid,payload FROM isolated_boards WHERE id=?").get(id); return r ? {gid:r.gid,members:JSON.parse(r.payload)} : null; },
+    putIsolatedRoster(id, members) { db.prepare("UPDATE isolated_boards SET payload=? WHERE id=?").run(JSON.stringify(members),id); },
     listLocalGuilds() {
       return db
         .prepare("SELECT payload FROM local_guilds ORDER BY gid")

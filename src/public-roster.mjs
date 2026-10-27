@@ -43,3 +43,29 @@ export async function loadRosterWithFallback({ api, gid, signal, token = '', cat
     return current;
   }
 }
+
+const personalRosterKey = (gid) => `guildwar-personal-roster:${gid}`;
+export async function loadPersonalRoster({gid, signal, catalogURL, storage = localStorage}) {
+  const raw = storage.getItem(personalRosterKey(gid));
+  if (raw) {
+    const members = JSON.parse(raw);
+    if (!catalogRoster({guilds:{[gid]:{rank:1,members}}}, gid)) throw new Error('保存した名簿を読み込めません');
+    return {members, mode:'manual', source:'browser', stale:false};
+  }
+  try {
+    const response = await fetch(catalogURL, {signal});
+    if (!response.ok) throw new Error('公開名簿を取得できません');
+    const row = catalogRoster(await response.json(), gid);
+    if (!row) throw new Error('公開名簿を取得できません');
+    return {members:row.members, mode:'public', source:row.source, needsSetup:!row.members.length, publicObservedAt:row.observedAt, publicIncomplete:row.incomplete, reportedMemberCount:row.reportedMemberCount};
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    return {members:[], needsSetup:true, stale:true, warning:'公開名簿を取得できません。メンバーを手動で登録できます。'};
+  }
+
+}
+export function savePersonalRoster(gid, members, storage = localStorage) {
+  if (!catalogRoster({guilds:{[gid]:{rank:1,members}}}, gid)) throw new Error('名簿の形式が正しくありません');
+  storage.setItem(personalRosterKey(gid), JSON.stringify(members));
+  return {members, mode:'manual', source:'browser', stale:false};
+}

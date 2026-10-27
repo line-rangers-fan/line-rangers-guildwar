@@ -14,7 +14,7 @@ import "./compact.css";
 import { apiURL, pagePath, publicBoardURL, transferToPublicSite, transferMessage } from "./runtime.mjs";
 import { loadPrivateBoard, savePrivateBoard, checkedEntries } from "../shared/boards.mjs";
 import { groupMembers } from "../shared/checklist.mjs";
-import { loadRosterWithFallback } from "./public-roster.mjs";
+import { loadPersonalRoster, savePersonalRoster } from "./public-roster.mjs";
 import { loadGuildDirectory } from "./public-directory.mjs";
 import { AttackControl } from "./AttackControl.jsx";
 import { PREFERENCES_KEY, loadPersonal, initialChoice, resetPersonal } from "../shared/personal.mjs";
@@ -129,6 +129,7 @@ function App() {
   const [selection, setSelection] = useState(loadChoice);
   const team = "ally";
   const [sharing, setSharing] = useState(query.get("share") === "1");
+  const [boardKey, setBoardKey] = useState(() => new URLSearchParams(location.hash.slice(1)).get("board") || "");
   const [shareFallback, setShareFallback] = useState("");
   const [country, setCountry] = useState(""),
     [tier, setTier] = useState(""),
@@ -159,6 +160,8 @@ function App() {
   const [token] = useState(
       () => { try { return sessionStorage.getItem("guildwar-write-token") || ""; } catch { return ""; } },
     );
+  const editingRef = useRef(false);
+  editingRef.current = editingRoster || Boolean(rankEditor);
   const [refresh, setRefresh] = useState(0),
     [notice, setNotice] = useState(transferMessage);
   const generation = useRef(0),
@@ -243,9 +246,9 @@ function App() {
     history.replaceState(
       null,
       "",
-      `${pagePath(view)}${q.size ? `?${q}` : ""}`,
+      `${pagePath(view)}${q.size ? `?${q}` : ""}${sharing && boardKey ? `#board=${boardKey}` : ""}`,
     );
-  }, [selection, team, view, registeredGuilds, sort, filterDay, filter, sharing, currentDay]);
+  }, [selection, team, view, registeredGuilds, sort, filterDay, filter, sharing, currentDay, boardKey]);
   useEffect(() => {
     const seq = ++generation.current;
     const c = new AbortController();
@@ -256,24 +259,27 @@ function App() {
     setRankEditor(null);
     if (!gid) { setRosterLoading(false); return () => c.abort(); }
     setRosterLoading(true);
+    const boardHeaders = {"x-board-key":boardKey};
     async function readChecks() {
-      if (sharing) return api(`/api/guilds/${gid}/checks?team=${team}&week=${week}`, { signal: c.signal });
+      if (sharing) {
+        if (!/^[0-9a-f]{64}$/.test(boardKey)) throw new Error("以前の共有URLは分離されていません。新しい共有リンクを作成してください。");
+        const result = await api(`/api/boards?week=${week}`, {signal:c.signal, headers:boardHeaders});
+        if (result.gid !== gid) throw new Error("共有リンクのギルドが一致しません。");
+        return result;
+      }
       const saved = loadPrivateBoard(localStorage, gid, week);
       if (saved.exists) return { states: saved.states };
       const states = {};
       if (!c.signal.aborted) savePrivateBoard(localStorage, gid, week, states);
       return { states };
     }
-    const readRoster = () => loadRosterWithFallback({
-      api, gid, signal:c.signal, token,
-      catalogURL:new URL(`data/rosters/${gid}.json`, publicBoardURL()),
-    });
+    const readRoster = () => sharing ? Promise.resolve(null) : loadPersonalRoster({gid, signal:c.signal, catalogURL:new URL(`data/rosters/${gid}.json`, publicBoardURL())});
     Promise.all([
       readRoster(),
       readChecks(),
     ])
       .then(([r, s]) => {
-        if (seq === generation.current) { setRoster(r); setStates(s.states); if (s.migrated) announce("以前のチェックを自分用に引き継ぎました。"); }
+        if (seq === generation.current) { setRoster(sharing ? {members:s.members, mode:"manual", source:"shared:board"} : r); setStates(s.states); if (s.migrated) announce("以前のチェックを自分用に引き継ぎました。"); }
       })
       .catch((e) => {
         if (e.name !== "AbortError" && seq === generation.current) setError(e.message);
@@ -282,18 +288,20 @@ function App() {
         if (seq === generation.current && !c.signal.aborted) setRosterLoading(false);
       });
     const poll = setInterval(() => {
-      if (!sharing || busy.current || document.hidden) return;
+      if (!sharing || busy.current || editingRef.current || document.hidden) return;
       const rev = revision.current;
-      api(`/api/guilds/${gid}/checks?team=${team}&week=${week}`, {
-        signal: c.signal,
+      api(`/api/boards?week=${week}`, {
+        signal: c.signal, headers:boardHeaders,
       })
         .then((s) => {
           if (
             seq === generation.current &&
             rev === revision.current &&
-            !busy.current
-          )
+            !busy.current && !editingRef.current
+          ) {
             setStates(s.states);
+            setRoster({members:s.members, mode:"manual", source:"shared:board"});
+          }
         })
         .catch(() => {});
     }, 15000);
@@ -301,7 +309,7 @@ function App() {
       c.abort();
       clearInterval(poll);
     };
-  }, [gid, team, week, refresh, sharing]);
+  }, [gid, team, week, refresh, sharing, boardKey]);
   useEffect(() => {
     setPvpReference({ gid: "", members: [] });
     setPvpWarning("");
@@ -353,13 +361,13 @@ function App() {
         savePrivateBoard(localStorage, gid, week, nextStates);
         return;
       }
-      const r = await api(`/api/guilds/${gid}/checks`, {
+      const r = await api(`/api/boards/check`, {
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json", "x-board-key":boardKey,
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ team, uid, day, slot, checked: value }),
+        body: JSON.stringify({ uid, day, slot, checked: value }),
       });
       if (seq === generation.current) {
         setStates(r.states);
@@ -382,15 +390,11 @@ function App() {
     setSaving(true);
     setRankError("");
     try {
-      const latest = await api(`/api/guilds/${gid}/members`);
+      const latest = roster;
       if (seq !== generation.current) return;
-      if (!latest.members.some((m) => m.uid === rankEditor.uid)) throw new Error("このメンバーは名簿から削除されています。");
+      if (!latest?.members.some((m) => m.uid === rankEditor.uid)) throw new Error("このメンバーは名簿から削除されています。");
       const updated = latest.members.map((m) => m.uid === rankEditor.uid ? { ...m, pvpLeaguePhase: rankEditor.rank } : m);
-      const result = await api(`/api/guilds/${gid}/roster`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ members: updated }),
-      });
+      const result = await persistRoster(updated);
       if (seq === generation.current) {
         setRoster(result);
         setRankEditor(null);
@@ -477,6 +481,11 @@ function App() {
     setMemberSearch("");
     setFilter("all");
   }
+  async function persistRoster(draft) {
+    revision.current++;
+    if (!sharing) return savePersonalRoster(gid, draft);
+    return api('/api/boards/roster', {method:'PUT', headers:{'Content-Type':'application/json','x-board-key':boardKey, ...(token ? {Authorization:`Bearer ${token}`} : {})}, body:JSON.stringify({members:draft})});
+  }
   async function share() {
     if (!gid || busy.current) return;
     const seq = generation.current;
@@ -484,17 +493,18 @@ function App() {
     const url = publicBoardURL();
     url.searchParams.set("gid", gid); url.searchParams.set("share", "1"); url.searchParams.set("day", currentDay);
     try {
+      let key = boardKey;
       if (!sharing) {
-        const result = await api(`/api/guilds/${gid}/share`, {
-          method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify({ week, entries: checkedEntries(states, members, dates) }),
-        });
+        key = Array.from(crypto.getRandomValues(new Uint8Array(32)), b=>b.toString(16).padStart(2,'0')).join('');
+        const result = await api('/api/boards', {method:'POST', headers:{'Content-Type':'application/json','x-board-key':key, ...(token ? {Authorization:`Bearer ${token}`} : {})}, body:JSON.stringify({gid, members:roster.members, week, entries:checkedEntries(states, roster.members, dates)})});
         if (seq !== generation.current) return;
-        setSharing(true); setStates(result.states);
+        setBoardKey(key); setSharing(true); setStates(result.states);
       }
+      if (!/^[0-9a-f]{64}$/.test(key)) throw new Error("以前の共有URLは使用できません。自分用へ戻り、新しいリンクを作成してください。");
+      url.hash = `board=${key}`;
       setShareFallback(url.href);
       try { await navigator.clipboard.writeText(url.href); announce("共有リンクをコピーしました。LINEに貼り付けて共有できます。"); }
-      catch { announce("共有を開始しました。表示されたURLをコピーしてください。"); }
+      catch { announce("表示されたURLをコピーしてください。"); }
     } catch (e) { if (seq === generation.current) setError(e.message); }
     finally { busy.current = false; setSaving(false); }
   }
@@ -695,7 +705,7 @@ function App() {
                 <div className="checker-actions">
                   <button className="button" onClick={() => setView("ranking")}>ランキング</button>
                   <button className="button" onClick={() => setRefresh((n) => n + 1)} disabled={guildLoading || rosterLoading || saving || editingRoster || Boolean(rankEditor)}>更新</button>
-                  <button className="button" onClick={share} disabled={!gid || saving || rosterLoading}>{sharing ? "共有リンクをコピー" : "共有リンクを作成"}</button>
+                  <button className="button" onClick={share} disabled={!gid || !roster || saving || rosterLoading}>{sharing ? "共有リンクをコピー" : "共有リンクを作成"}</button>
                   {members.length > 0 && <button className="button" disabled={saving || rosterLoading} onClick={() => setEditingRoster(true)}>名簿を管理</button>}
                   {sharing && <button className="button" onClick={() => { setSharing(false); setShareFallback(""); setSelection({ ...personalSelection.current }); }}>自分用へ戻る</button>}
                 </div>
@@ -705,7 +715,7 @@ function App() {
                     {personalGuilds.map((g) => <option key={g.gid} value={g.gid}>{g.name}</option>)}
                   </select>
                 </label>
-                {sharing && <p className="personal-note">このリンクを知っている人がチェックを編集できます。</p>}
+                {sharing && <p className="personal-note">このリンクを知っている人が名簿とチェックを編集できます。リンクは共有相手だけに送ってください。</p>}
                 {shareFallback && <label className="share-url-field">LINEに貼り付ける共有URL<input aria-label="共有URL" readOnly value={shareFallback} onFocus={(e) => e.target.select()} /></label>}
                 <div className="personal-list-actions">
                 {personalGuilds.some((g) => g.gid === gid) && <button className="text-button" onClick={removePersonal}>選択中のギルドの登録を解除</button>}
@@ -719,7 +729,7 @@ function App() {
                     <span className="checklist-summary">{!registeredGuilds.some((g) => g.gid === gid) && guild && <button className="text-button" onClick={() => registerPersonal(guild)}>自分に登録</button>}<span>{currentDay.slice(5).replace("-", "/")} 残り <b>{rosterLoading || rosterUnavailable ? "—" : dayRemaining}</b>回</span></span>
                   </div>
                   {pvpWarning && <div className="alert warning" role="status">{pvpWarning}</div>}
-                  {pvpReference.gid === gid && pvpReference.fetchedAt && <p className="personal-note">ランク取得 {dateText(pvpReference.fetchedAt)} · 照合 {members.filter((m) => displayedPvpRank(m)).length}/{members.length}人</p>}
+                  {pvpReference.gid === gid && pvpReference.fetchedAt && <p className="personal-note">参照元APIへの取得 {dateText(pvpReference.fetchedAt)}（ゲーム内の観測時刻は不明、名前で照合） · 照合 {members.filter((m) => displayedPvpRank(m)).length}/{members.length}人</p>}
                   {roster?.publicObservedAt && <p className="personal-note">公開名簿の更新日時：{dateText(roster.publicObservedAt)} JST{roster.publicIncomplete ? ` ／ 配信済み${members.length}人・公称${roster.reportedMemberCount}人` : ""}</p>}
                   {!rosterLoading && roster && members.length === 0 && <button className="button" onClick={() => setEditingRoster(true)}>メンバーを登録</button>}
                   {editingRoster && (
@@ -728,6 +738,7 @@ function App() {
                       gid={gid}
                       members={members}
                       token={token}
+                      saveRoster={persistRoster}
                       onClose={() => setEditingRoster(false)}
                       onSaved={(r) => {
                         setRoster(r);

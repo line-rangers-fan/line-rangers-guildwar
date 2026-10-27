@@ -40,3 +40,10 @@ export const rosters = sqliteTable("rosters", {
   observedAt: text("observed_at"),
   updatedAt: text("updated_at").notNull(),
 });
+
+export const isolatedBoards = sqliteTable("isolated_boards", {
+  id: text("id").primaryKey(),
+  gid: text("gid").notNull(),
+  payload: text("payload").notNull(),
+  createdAt: text("created_at").notNull(),
+});

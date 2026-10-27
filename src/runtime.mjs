@@ -8,7 +8,7 @@ export const pagePath = (view) => `${basePath}${view === "ranking" ? "guild-trac
 export function publicBoardURL() {
   return new URL(["localhost", "127.0.0.1"].includes(location.hostname) ? basePath : PUBLIC_ROOT, location.origin);
 }
-const supportedKey = (key) => typeof key === "string" && (key === PREFERENCES_KEY || key === "guildwar-selection" || (key.startsWith("guildwar-private-checks:") && validId(key.slice("guildwar-private-checks:".length))));
+const supportedKey = (key) => typeof key === "string" && (key === PREFERENCES_KEY || key === "guildwar-selection" || (key.startsWith("guildwar-private-checks:") && validId(key.slice("guildwar-private-checks:".length))) || (key.startsWith("guildwar-personal-roster:") && validId(key.slice("guildwar-personal-roster:".length))));
 export function transferToPublicSite() {
   const entries = [];
   for (let i = 0; i < localStorage.length; i++) {
