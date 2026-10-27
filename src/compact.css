@@ -156,3 +156,17 @@ button.attack-result:disabled { opacity:.6; cursor:wait; }
 .attack-dialog .attack-dialog-hint { margin:14px 0 6px; font-size:12px; }
 @media (max-width:480px) { button.attack-result { width:25px; height:25px; font-size:15px; } .checklist-heading .win-summary { font-size:11px; } }
 
+
+/* Keep member names legible on mobile, including disabled rank controls. */
+.compact-checker .compact-member-table tbody .member-name,
+.compact-checker .compact-member-table tbody .member-name .member-rank-button,
+.compact-checker .compact-member-table tbody .member-name .member-name-text {
+  color: #172b20;
+  opacity: 1;
+  -webkit-text-fill-color: #172b20;
+}
+.compact-checker .compact-member-table tbody .member-name .member-rank-button:disabled {
+  color: #172b20;
+  opacity: 1;
+  -webkit-text-fill-color: #172b20;
+}
