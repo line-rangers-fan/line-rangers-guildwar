@@ -21,7 +21,8 @@ import { loadGuildDirectory } from "./public-directory.mjs";
 import { AttackControl } from "./AttackControl.jsx";
 import { PREFERENCES_KEY, loadPersonal, initialChoice, resetPersonal } from "../shared/personal.mjs";
 import { RosterEditor, GuildRegistration } from "./RosterEditor.jsx";
-import { normalizeReferenceMembers, withReferencePvp, displayedPvpRank } from "../shared/pvp.mjs";
+import { withReferencePvp, displayedPvpRank } from "../shared/pvp.mjs";
+import { cachedPvp, loadPvpSnapshot, pvpSnapshotIsStale } from "./pvp-snapshot.mjs";
 
 function Icon({ name, size = 20, ...props }) {
   const paths = {
@@ -339,22 +340,25 @@ function App() {
       return;
     }
     const controller = new AbortController();
-    setPvpLoading(true);
-    api(`/api/guilds/${gid}/pvp?refresh=1`, { signal: controller.signal })
-      .then((result) => {
-        if (!controller.signal.aborted) {
-          if (result.stale) {
-            setPvpWarning("最新のランクを確認できないため、前回取得したランクを表示しています。");
-          }
-          setPvpReference({ gid, members: normalizeReferenceMembers(result.members), fetchedAt: result.fetchedAt });
+    let storage;
+    try { storage = localStorage; } catch { storage = { getItem: () => null, setItem: () => {} }; }
+    const cached = cachedPvp(storage, gid);
+    setPvpReference(cached || { gid, members: [] });
+    setPvpLoading(!cached);
+    loadPvpSnapshot({ gid, storage, signal: controller.signal, url: new URL(`data/pvp/${encodeURIComponent(gid)}.json`, publicBoardURL()) })
+      .then(({ snapshot, offline }) => {
+        if (controller.signal.aborted) return;
+        if (!snapshot) {
+          setPvpWarning("保存済みのPvPランクはまだありません。毎週土曜日に一括更新します。");
+        } else {
+          setPvpReference(snapshot);
+          if (offline || pvpSnapshotIsStale(snapshot.fetchedAt)) setPvpWarning("PvPランクは前回取得した保存データです。最新の土曜日の更新を確認できませんでした。");
         }
       })
-      .catch((error) => {
-        if (!controller.signal.aborted && error.name !== "AbortError") setPvpWarning("PvPランクを更新できませんでした。取得済みのランクがあれば引き続き表示します。");
-      })
+      .catch((error) => { if (error.name !== "AbortError" && !controller.signal.aborted) setPvpWarning("PvPランクの保存データを読み込めませんでした。"); })
       .finally(() => { if (!controller.signal.aborted) setPvpLoading(false); });
     return () => controller.abort();
-  }, [gid, view, refresh]);
+  }, [gid, view]);
   useEffect(() => {
     setPage(1);
   }, [country, search, rankLimit, rankSort, tier]);

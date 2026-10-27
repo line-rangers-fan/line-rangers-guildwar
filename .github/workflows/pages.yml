@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: "17 * * * *"
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Refresh weekly PvP snapshots"]
+    types: [completed]
+    branches: [main]
 permissions:
   contents: read
   pages: write
@@ -14,12 +18,17 @@ concurrency:
   cancel-in-progress: true
 jobs:
   publish:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: data/pvp-weekly
+          path: pvp-snapshot
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -28,9 +37,11 @@ jobs:
       - run: npm test
       - run: npm run build:pages
       - run: node scripts/build-roster-catalog.mjs
+      - run: mkdir -p pages-dist/data/pvp && cp -R pvp-snapshot/pvp-cache/. pages-dist/data/pvp/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: pages-dist
       - id: deployment
         uses: actions/deploy-pages@v4
+
