@@ -3,7 +3,7 @@ const root='https://line-rangers-fan.github.io/line-rangers-guildwar/';
 const htmlResponse=await fetch(root,{signal:AbortSignal.timeout(30000),cache:'no-store'});
 assert.equal(htmlResponse.status,200);
 const html=await htmlResponse.text();
-const match=html.match(/src="([^"]*assets\\/app\\.js[^"]*)"/);
+const match=html.match(/src="([^"]*app[.]js[^"]*)"/);
 assert.ok(match,'app JS entry');
 const jsResponse=await fetch(new URL(match[1],root),{signal:AbortSignal.timeout(30000),cache:'no-store'});
 assert.equal(jsResponse.status,200);
