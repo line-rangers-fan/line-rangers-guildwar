@@ -160,7 +160,7 @@ export function createApp({
     }
   });
   app.get("/api/guilds/:gid/members", params, async (req, res) => {
-    const r = await sources.members(req.params.gid, { includePvp:req.query.include_pvp !== '0' });
+    const r = await sources.members(req.params.gid, { includePvp:req.query.include_pvp === '1' });
     res.json({
       members: r.data,
       mode: r.mode,
@@ -181,7 +181,7 @@ export function createApp({
     res.json({ states: store.getChecks(req.params.gid, "ally", checked.dates[0], checked.dates[2]) });
   });
   app.post("/api/guilds/:gid/sync", params, authorizeWrite, async (req, res) => {
-    const r = await sources.syncMembers(req.params.gid, { includePvp:req.query.include_pvp !== '0' });
+    const r = await sources.syncMembers(req.params.gid, { includePvp:req.query.include_pvp === '1' });
     res.json({ members: r.data, mode: r.mode, source: r.source, fetchedAt: r.fetchedAt, updatedAt: r.updatedAt, stale: r.stale, warning: r.warning, needsSetup: r.needsSetup });
   });
   app.get("/api/guilds/:gid/checks", params, (req, res) => {
