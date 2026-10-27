@@ -62,6 +62,12 @@ async function api(path, options = {}) {
   if (!r.ok) throw new Error(d.error || "通信に失敗しました");
   return d;
 }
+async function boardApi(path, options = {}) {
+  const r = await fetch(`https://line-rangers-guildwar-share-api.n-yu1791.chatgpt.site${path}`, options);
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || "共有記録に接続できません");
+  return d;
+}
 const number = (n) => new Intl.NumberFormat("ja").format(n || 0);
 const dateText = (s) =>
   s
@@ -129,6 +135,7 @@ function App() {
   const [selection, setSelection] = useState(loadChoice);
   const team = "ally";
   const [sharing, setSharing] = useState(query.get("share") === "1");
+  const [boardKey, setBoardKey] = useState(() => new URLSearchParams(location.hash.slice(1)).get("board") || "");
   const [shareFallback, setShareFallback] = useState("");
   const [country, setCountry] = useState(""),
     [tier, setTier] = useState(""),
@@ -243,9 +250,9 @@ function App() {
     history.replaceState(
       null,
       "",
-      `${pagePath(view)}${q.size ? `?${q}` : ""}`,
+      `${pagePath(view)}${q.size ? `?${q}` : ""}${sharing && boardKey ? `#board=${encodeURIComponent(boardKey)}` : ""}`,
     );
-  }, [selection, team, view, registeredGuilds, sort, filterDay, filter, sharing, currentDay]);
+  }, [selection, team, view, registeredGuilds, sort, filterDay, filter, sharing, currentDay, boardKey]);
   useEffect(() => {
     const seq = ++generation.current;
     const c = new AbortController();
@@ -257,6 +264,12 @@ function App() {
     if (!gid) { setRosterLoading(false); return () => c.abort(); }
     setRosterLoading(true);
     async function readChecks() {
+      if (sharing && boardKey) {
+        if (!/^[0-9a-f]{64}$/.test(boardKey)) throw new Error("共有リンクが正しくありません。");
+        const result = await boardApi(`/api/boards?week=${week}`, {signal:c.signal,headers:{"x-board-key":boardKey}});
+        if (result.gid !== gid) throw new Error("共有リンクのギルドが一致しません。");
+        return result;
+      }
       if (sharing) return api(`/api/guilds/${gid}/checks?team=${team}&week=${week}`, { signal: c.signal });
       const saved = loadPrivateBoard(localStorage, gid, week);
       if (saved.exists) return { states: saved.states };
@@ -284,9 +297,7 @@ function App() {
     const poll = setInterval(() => {
       if (!sharing || busy.current || document.hidden) return;
       const rev = revision.current;
-      api(`/api/guilds/${gid}/checks?team=${team}&week=${week}`, {
-        signal: c.signal,
-      })
+      (boardKey ? boardApi(`/api/boards?week=${week}`, {signal:c.signal,headers:{"x-board-key":boardKey}}) : api(`/api/guilds/${gid}/checks?team=${team}&week=${week}`, {signal:c.signal}))
         .then((s) => {
           if (
             seq === generation.current &&
@@ -301,7 +312,7 @@ function App() {
       c.abort();
       clearInterval(poll);
     };
-  }, [gid, team, week, refresh, sharing]);
+  }, [gid, team, week, refresh, sharing, boardKey]);
   useEffect(() => {
     setPvpWarning("");
     if (view !== "checker" || !gid || gid.startsWith("local-")) {
@@ -351,11 +362,15 @@ function App() {
         savePrivateBoard(localStorage, gid, week, nextStates);
         return;
       }
-      const r = await api(`/api/guilds/${gid}/checks`, {
+      if (boardKey) {
+        await boardApi('/api/boards/roster', {method:'PUT',headers:{'Content-Type':'application/json','x-board-key':boardKey},body:JSON.stringify({members:roster.members})});
+      }
+      const r = await (boardKey ? boardApi : api)(boardKey ? '/api/boards/check' : `/api/guilds/${gid}/checks`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(boardKey ? {"x-board-key":boardKey} : {}),
+          ...(token && !boardKey ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ team, uid, day, slot, checked: value }),
       });
@@ -483,12 +498,14 @@ function App() {
     url.searchParams.set("gid", gid); url.searchParams.set("share", "1"); url.searchParams.set("day", currentDay);
     try {
       if (!sharing) {
-        const result = await api(`/api/guilds/${gid}/share`, {
-          method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify({ week, entries: checkedEntries(states, members, dates) }),
-        });
+        const key = Array.from(crypto.getRandomValues(new Uint8Array(32)), b=>b.toString(16).padStart(2,'0')).join('');
+        const result = await boardApi('/api/boards', {method:'POST',headers:{'Content-Type':'application/json','x-board-key':key},body:JSON.stringify({gid,members:roster.members,week,entries:checkedEntries(states,roster.members,dates)})});
         if (seq !== generation.current) return;
-        setSharing(true); setStates(result.states);
+        setBoardKey(key); setSharing(true); setStates(result.states);
+        url.hash = `board=${key}`;
+      } else if (boardKey) {
+        if (!/^[0-9a-f]{64}$/.test(boardKey)) throw new Error("共有リンクが正しくありません。");
+        url.hash = `board=${boardKey}`;
       }
       setShareFallback(url.href);
       try { await navigator.clipboard.writeText(url.href); announce("共有リンクをコピーしました。LINEに貼り付けて共有できます。"); }
@@ -703,7 +720,7 @@ function App() {
                     {personalGuilds.map((g) => <option key={g.gid} value={g.gid}>{g.name}</option>)}
                   </select>
                 </label>
-                {sharing && <p className="personal-note">このリンクを知っている人がチェックを編集できます。</p>}
+                {sharing && <p className="personal-note">{boardKey ? "このリンクを知っている人がチェックを編集できます。" : "以前の共有リンクです。同じギルドの旧リンクとチェックが共有されます。"}</p>}
                 {shareFallback && <label className="share-url-field">LINEに貼り付ける共有URL<input aria-label="共有URL" readOnly value={shareFallback} onFocus={(e) => e.target.select()} /></label>}
                 <div className="personal-list-actions">
                 {personalGuilds.some((g) => g.gid === gid) && <button className="text-button" onClick={removePersonal}>選択中のギルドの登録を解除</button>}
