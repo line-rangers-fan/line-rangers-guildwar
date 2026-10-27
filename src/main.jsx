@@ -490,14 +490,14 @@ function App() {
     setMemberSearch("");
     setFilter("all");
   }
-  async function share() {
+  async function share(createNew = false) {
     if (!gid || busy.current) return;
     const seq = generation.current;
     busy.current = true; setSaving(true); setError("");
     const url = publicBoardURL();
     url.searchParams.set("gid", gid); url.searchParams.set("share", "1"); url.searchParams.set("day", currentDay);
     try {
-      if (!sharing) {
+      if (!sharing || createNew) {
         const key = Array.from(crypto.getRandomValues(new Uint8Array(32)), b=>b.toString(16).padStart(2,'0')).join('');
         const result = await boardApi('/api/boards', {method:'POST',headers:{'Content-Type':'application/json','x-board-key':key},body:JSON.stringify({gid,members:roster.members,week,entries:checkedEntries(states,roster.members,dates)})});
         if (seq !== generation.current) return;
@@ -710,7 +710,8 @@ function App() {
                 <div className="checker-actions">
                   <button className="button" onClick={() => setView("ranking")}>ランキング</button>
                   <button className="button" onClick={() => setRefresh((n) => n + 1)} disabled={guildLoading || rosterLoading || saving || editingRoster || Boolean(rankEditor)}>更新</button>
-                  <button className="button" onClick={share} disabled={!gid || saving || rosterLoading}>{sharing ? "共有リンクをコピー" : "共有リンクを作成"}</button>
+                  <button className="button" onClick={() => share(false)} disabled={!gid || saving || rosterLoading}>{sharing ? "この共有リンクをコピー" : "共有リンクを作成"}</button>
+                  {sharing && <button className="button" onClick={() => share(true)} disabled={!gid || saving || rosterLoading}>新しい共有リンクを作成</button>}
                   {members.length > 0 && <button className="button" disabled={saving || rosterLoading} onClick={() => setEditingRoster(true)}>名簿を管理</button>}
                   {sharing && <button className="button" onClick={() => { setSharing(false); setShareFallback(""); setSelection({ ...personalSelection.current }); }}>自分用へ戻る</button>}
                 </div>
@@ -720,7 +721,7 @@ function App() {
                     {personalGuilds.map((g) => <option key={g.gid} value={g.gid}>{g.name}</option>)}
                   </select>
                 </label>
-                {sharing && <p className="personal-note">{boardKey ? "このリンクを知っている人がチェックを編集できます。" : "以前の共有リンクです。同じギルドの旧リンクとチェックが共有されます。"}</p>}
+                {sharing && <p className="personal-note">{boardKey ? "このリンクを知っている人がチェックを編集できます。新しい共有リンクを作成すると、現在のチェックをコピーした別の表になります。" : "以前の共有リンクです。同じギルドの旧リンクとチェックが共有されます。新しい共有リンクを作成すると別の表になります。"}</p>}
                 {shareFallback && <label className="share-url-field">LINEに貼り付ける共有URL<input aria-label="共有URL" readOnly value={shareFallback} onFocus={(e) => e.target.select()} /></label>}
                 <div className="personal-list-actions">
                 {personalGuilds.some((g) => g.gid === gid) && <button className="text-button" onClick={removePersonal}>選択中のギルドの登録を解除</button>}
