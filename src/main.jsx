@@ -19,7 +19,8 @@ import { loadGuildDirectory } from "./public-directory.mjs";
 import { AttackControl } from "./AttackControl.jsx";
 import { PREFERENCES_KEY, loadPersonal, initialChoice, resetPersonal } from "../shared/personal.mjs";
 import { RosterEditor, GuildRegistration } from "./RosterEditor.jsx";
-import { normalizeReferenceMembers, withReferencePvp, displayedPvpRank } from "../shared/pvp.mjs";
+import { withReferencePvp, displayedPvpRank } from "../shared/pvp.mjs";
+import { cachedPvp, loadPvpSnapshot, pvpSnapshotIsStale } from "./pvp-snapshot.mjs";
 
 function Icon({ name, size = 20, ...props }) {
   const paths = {
@@ -320,22 +321,25 @@ function App() {
       return;
     }
     const controller = new AbortController();
-    setPvpLoading(true);
-    api(`/api/guilds/${gid}/pvp?refresh=1`, { signal: controller.signal })
-      .then((result) => {
-        if (!controller.signal.aborted) {
-          if (result.stale) {
-            setPvpWarning("最新のランクを確認できないため、前回取得したランクを表示しています。");
-          }
-          setPvpReference({ gid, members: normalizeReferenceMembers(result.members), fetchedAt: result.fetchedAt });
+    let storage;
+    try { storage = localStorage; } catch { storage = { getItem: () => null, setItem: () => {} }; }
+    const cached = cachedPvp(storage, gid);
+    setPvpReference(cached || { gid, members: [] });
+    setPvpLoading(!cached);
+    loadPvpSnapshot({ gid, storage, signal: controller.signal, url: new URL(`data/pvp/${encodeURIComponent(gid)}.json`, publicBoardURL()) })
+      .then(({ snapshot, offline }) => {
+        if (controller.signal.aborted) return;
+        if (!snapshot) {
+          setPvpWarning("保存済みのPvPランクはまだありません。毎週土曜日に一括更新します。");
+        } else {
+          setPvpReference(snapshot);
+          if (offline || pvpSnapshotIsStale(snapshot.fetchedAt)) setPvpWarning("PvPランクは前回取得した保存データです。最新の土曜日の更新を確認できませんでした。");
         }
       })
-      .catch((error) => {
-        if (!controller.signal.aborted && error.name !== "AbortError") setPvpWarning("PvPランクを更新できませんでした。取得済みのランクがあれば引き続き表示します。");
-      })
+      .catch((error) => { if (error.name !== "AbortError" && !controller.signal.aborted) setPvpWarning("PvPランクの保存データを読み込めませんでした。"); })
       .finally(() => { if (!controller.signal.aborted) setPvpLoading(false); });
     return () => controller.abort();
-  }, [gid, view, refresh]);
+  }, [gid, view]);
   useEffect(() => {
     setPage(1);
   }, [country, search, rankLimit, rankSort, tier]);
@@ -735,7 +739,7 @@ function App() {
                     <span className="checklist-summary">{!registeredGuilds.some((g) => g.gid === gid) && guild && <button className="text-button" onClick={() => registerPersonal(guild)}>自分に登録</button>}<span>{currentDay.slice(5).replace("-", "/")} 残り <b>{rosterLoading || rosterUnavailable ? "—" : dayRemaining}</b>回</span></span>
                   </div>
                   {pvpWarning && <div className="alert warning" role="status">{pvpWarning}</div>}
-                  {pvpReference.gid === gid && pvpReference.fetchedAt && <p className="personal-note">ランク取得 {dateText(pvpReference.fetchedAt)} · 照合 {members.filter((m) => displayedPvpRank(m)).length}/{members.length}人</p>}
+                  {pvpReference.gid === gid && pvpReference.fetchedAt && <p className="personal-note">PvPランク取得 {dateText(pvpReference.fetchedAt)} · 毎週土曜更新 · 照合 {members.filter((m) => displayedPvpRank(m)).length}/{members.length}人</p>}
                   {roster?.publicObservedAt && <p className="personal-note">公開名簿の更新日時：{dateText(roster.publicObservedAt)} JST{roster.publicIncomplete ? ` ／ 配信済み${members.length}人・公称${roster.reportedMemberCount}人` : ""}</p>}
                   {!rosterLoading && roster && members.length === 0 && <button className="button" onClick={() => setEditingRoster(true)}>メンバーを登録</button>}
                   {editingRoster && (
@@ -1066,3 +1070,4 @@ function App() {
   );
 }
 createRoot(document.getElementById("root")).render(<App />);
+
