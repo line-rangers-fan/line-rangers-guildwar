@@ -1,16 +1,21 @@
 import React from "react";
 
-export function AttackControl({ name, day, slot, value, disabled, onChange }) {
+export function AttackControl({ name, day, slot, attacked, result, disabled, onChange }) {
+  const value = !attacked ? "empty" : result || "unknown";
   return (
     <label className="attack-control">
-      <input
-        type="checkbox"
-        className="attack-check"
-        checked={value}
+      <select
+        className={`attack-result result-${value}`}
+        value={value}
         disabled={disabled}
-        aria-label={`${name} ${day} ${slot}回目`}
-        onChange={(e) => onChange(e.target.checked)}
-      />
+        aria-label={`${name} ${day} ${slot}回目の勝敗`}
+        onChange={(e) => onChange(e.target.value === "empty" ? null : e.target.value)}
+      >
+        <option value="empty">—</option>
+        <option value="win">○</option>
+        <option value="loss">×</option>
+        <option value="unknown" disabled>済</option>
+      </select>
     </label>
   );
 }
