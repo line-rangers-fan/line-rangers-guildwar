@@ -884,7 +884,7 @@ function App() {
                                 <tr key={m.uid} className="member-row" data-member-id={m.uid}>
                                   <th scope="row" className="member-name">
                                     <span className="member-identity">
-                                      <button type="button" className="member-rank-button" disabled={saving} title={m.userName} onClick={() => { setRankError(""); setRankEditor({ uid: m.uid, name: m.userName, rank: m.pvpLeaguePhase || "" }); }} aria-label={`${m.userName}のPvPランク帯を設定`}><span className="member-name-text">{m.userName}</span></button>
+                                      <button type="button" className="member-rank-button" disabled={saving} title={m.userName} onClick={() => { setRankError(""); setRankEditor({ uid: m.uid, name: m.userName, rank: m.pvpLeaguePhase || "" }); }} aria-label={`${m.userName}のPvPランク帯を設定`}><span className="member-name-text" style={{ color: "#111111", WebkitTextFillColor: "#111111", opacity: 1, fontWeight: 700 }}>{m.userName}</span></button>
                                       <small className="sort-level">{levelLabel(m.level)}</small>
                                       <span className="member-pvp" aria-label={`PvPランク ${displayedPvpRank(m) ? pvpRankText(displayedPvpRank(m)) : pvpLoading ? "取得中" : "未取得"}`} title={displayedPvpRank(m) ? pvpRankText(displayedPvpRank(m)) : "PvPランク未取得"}>{displayedPvpRank(m) ? leagueLabel(displayedPvpRank(m)) : pvpLoading ? "…" : "—"}</span>
                                     </span>
