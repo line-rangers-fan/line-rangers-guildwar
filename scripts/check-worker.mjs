@@ -154,6 +154,14 @@ try {
   assert.equal(preflight.headers.get("access-control-allow-origin"), "https://line-rangers-fan.github.io");
   const pagesRead = await worker.fetch(new Request("https://test.local/api/health", { headers: { origin: "https://line-rangers-fan.github.io" } }), env);
   assert.equal(pagesRead.headers.get("access-control-allow-origin"), "https://line-rangers-fan.github.io");
+  const originalFetch = globalThis.fetch;
+  try {
+    let calls = 0;
+    globalThis.fetch = async () => new Response(JSON.stringify({ members: [{ userName: "太郎", pvpLeaguePhase: ++calls === 1 ? "GOLD_1" : "MASTER_2" }] }), { headers: { "content-type": "application/json" } });
+    assert.equal((await (await req("/api/guilds/guild1/pvp?refresh=1")).json()).members[0].pvpLeaguePhase, "GOLD_1");
+    assert.equal((await (await req("/api/guilds/guild1/pvp?refresh=1")).json()).members[0].pvpLeaguePhase, "MASTER_2");
+    assert.equal(calls, 2);
+  } finally { globalThis.fetch = originalFetch; }
   console.log(
     "Worker/D1 smoke checks passed: routing, authentication, roster, atomic check invariants, team separation, rename.",
   );

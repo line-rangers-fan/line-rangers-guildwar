@@ -137,12 +137,20 @@ export function createWorkerHandler(makeStore = createD1Store) {
           return json({ guild: g }, 201);
         }
         const match = path.match(
-          /^\/api\/guilds\/([^/]+)\/(members|roster|checks|sync|share)$/,
+          /^\/api\/guilds\/([^/]+)\/(members|pvp|roster|checks|sync|share)$/,
         );
         if (!match) return json({ error: "APIが見つかりません" }, 404);
         const [, gid, action] = match;
         if (!validId(gid))
           return json({ error: "ギルドIDが正しくありません" }, 400);
+        if (action === "pvp" && request.method === "GET") {
+          try {
+            const r = await sources.pvpMembers(gid, url.searchParams.get("refresh") === "1");
+            return json({ members: r.data, fetchedAt: r.fetchedAt, stale: r.stale, warning: r.warning });
+          } catch {
+            return json({ error: "PvPデータを取得できませんでした。時間をおいて再試行してください。" }, 503);
+          }
+        }
         if (action === "share" && request.method === "POST") {
           const roster = await store.getRoster(gid) || await sources.members(gid);
           let checked;

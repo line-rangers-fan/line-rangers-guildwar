@@ -141,6 +141,13 @@ export function createSources(store, config = {}, requestJSON) {
   }
   const sources = {
     syncMembers,
+    pvpMembers: async (gid, force = false) => cached(
+      `reference-members:${gid}`,
+      force ? 0 : 5 * 60000,
+      [REFERENCE_MEMBERS_URL.replace("{gid}", encodeURIComponent(gid))],
+      normalizeReferenceMembers,
+      { timeout: 35000 },
+    ),
     guildTiers: async () => {
       try {
         const result = await cached("rangerbook-ranking", 15 * 60000, [RANKING_URL], publicRankings);

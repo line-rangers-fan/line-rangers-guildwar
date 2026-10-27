@@ -151,6 +151,14 @@ export function createApp({
       warning: r.warning,
     });
   });
+  app.get("/api/guilds/:gid/pvp", params, async (req, res) => {
+    try {
+      const r = await sources.pvpMembers(req.params.gid, req.query.refresh === "1");
+      res.json({ members: r.data, fetchedAt: r.fetchedAt, stale: r.stale, warning: r.warning });
+    } catch {
+      res.status(503).json({ error: "PvPデータを取得できませんでした。時間をおいて再試行してください。" });
+    }
+  });
   app.get("/api/guilds/:gid/members", params, async (req, res) => {
     const r = await sources.members(req.params.gid);
     res.json({
