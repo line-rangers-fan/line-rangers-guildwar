@@ -170,3 +170,11 @@ button.attack-result:disabled { opacity:.6; cursor:wait; }
   opacity: 1;
   -webkit-text-fill-color: #172b20;
 }
+
+/* Strong contrast for every guild roster, including mobile WebView. */
+.compact-checker .compact-member-table tbody .member-name .member-name-text {
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+  font-weight: 700;
+  opacity: 1 !important;
+}
