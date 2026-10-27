@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeReferenceMembers, withReferencePvp } from "../shared/pvp.mjs";
 import { memberComparator } from "../shared/personal.mjs";
+import { leagueLabel } from "../shared/domain.mjs";
 import { openStore } from "../server/store.mjs";
 import { createSources } from "../server/sources.mjs";
 const reference = normalizeReferenceMembers({
@@ -37,6 +38,19 @@ test("reference ranks sort with the same PvP order as manual ranks", () => {
 test("reference format changes are rejected instead of partially trusted", () => {
   assert.throws(() => normalizeReferenceMembers({ members: "changed" }));
   assert.throws(() => normalizeReferenceMembers([{ level: 1 }]));
+});
+test("bronze subdivisions returned by the source retain their compact rank and sort order", () => {
+  const source = normalizeReferenceMembers([{ userName: "A", pvpLeaguePhase: "BRONZE_2" }]);
+  const combined = withReferencePvp([{ uid: "a", userName: "A", level: 100, pvpLeaguePhase: "" }], source);
+  assert.equal(combined[0].pvpReference, "BRONZE_2");
+  assert.equal(leagueLabel(combined[0].pvpReference), "B");
+  assert.ok(memberComparator({ key: "pvp", dir: -1 })(combined[0], { uid: "b", userName: "B", level: 100, pvpLeaguePhase: "BRONZE_3" }) < 0);
+});
+test("compact rank labels keep league and division clear", () => {
+  assert.deepEqual(
+    ["LEGEND", "MASTER_1", "MASTER_3", "DIAMOND_3", "GOLD_2", "SILVER_3", "BRONZE", "BRONZE_1", "BRONZE_2", "BRONZE_3"].map(leagueLabel),
+    ["L", "M1", "M3", "D3", "G2", "S3", "B", "B", "B", "B"],
+  );
 });
 test("reference PvP is served on read and never written into the stored roster", async () => {
   const store = openStore(":memory:");

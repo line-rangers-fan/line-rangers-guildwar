@@ -13,6 +13,9 @@ export const LEAGUES = [
   "SILVER_1",
   "SILVER_2",
   "SILVER_3",
+  "BRONZE_1",
+  "BRONZE_2",
+  "BRONZE_3",
   "BRONZE",
 ];
 export function japanDate(now = new Date()) {
@@ -58,6 +61,9 @@ export function leagueLabel(p) {
       SILVER_1: "S1",
       SILVER_2: "S2",
       SILVER_3: "S3",
+      BRONZE_1: "B",
+      BRONZE_2: "B",
+      BRONZE_3: "B",
       BRONZE: "B",
     }[p] ||
     p ||

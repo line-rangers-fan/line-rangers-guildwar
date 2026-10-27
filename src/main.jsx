@@ -6,6 +6,7 @@ import {
   weekDates,
   gameDate,
   levelLabel,
+  leagueLabel,
   LEAGUES,
 } from "../shared/domain.mjs";
 import "./style.css";
@@ -148,7 +149,7 @@ function App() {
     [rankSort, setRankSort] = useState({ key: "lastGuildWarRank", dir: 1 });
   const [rankEditor, setRankEditor] = useState(null);
   const [rankError, setRankError] = useState("");
-  const [pvpReference, setPvpReference] = useState([]),
+  const [pvpReference, setPvpReference] = useState({ gid: "", members: [] }),
     [pvpLoading, setPvpLoading] = useState(false),
     [pvpWarning, setPvpWarning] = useState("");
   const rankDialog = useRef(null);
@@ -302,7 +303,7 @@ function App() {
     };
   }, [gid, team, week, refresh, sharing]);
   useEffect(() => {
-    setPvpReference([]);
+    setPvpReference({ gid: "", members: [] });
     setPvpWarning("");
     if (view !== "checker" || !gid || gid.startsWith("local-")) {
       setPvpLoading(false);
@@ -313,7 +314,7 @@ function App() {
     api(`/api/guilds/${gid}/pvp`, { signal: controller.signal })
       .then((result) => {
         if (!controller.signal.aborted) {
-          setPvpReference(normalizeReferenceMembers(result.members));
+          setPvpReference({ gid, members: normalizeReferenceMembers(result.members) });
           if (result.stale) setPvpWarning("前回取得したPvPランクを表示しています。");
         }
       })
@@ -403,7 +404,7 @@ function App() {
   const guilds = useMemo(() => (guildResponse?.guilds || []).map((g) => ({ ...g, guildWarTier: tiersByGuild.get(g.gid)?.tier })), [guildResponse, tiersByGuild]);
   const personalGuilds = useMemo(() => registeredGuilds.filter((saved) => guilds.some((g) => g.gid === saved.gid) || directoryUnavailable && saved.lastGuildWarRank > 0 && saved.lastGuildWarRank <= 200).map((saved) => guilds.find((g) => g.gid === saved.gid) || saved), [guilds, registeredGuilds, directoryUnavailable]);
   const guild = guilds.find((g) => g.gid === gid) || personalGuilds.find((g) => g.gid === gid);
-  const members = useMemo(() => withReferencePvp(roster?.members || [], pvpReference), [roster, pvpReference]);
+  const members = useMemo(() => withReferencePvp(roster?.members || [], pvpReference.gid === gid ? pvpReference.members : []), [roster, pvpReference, gid]);
   const rosterUnavailable = !roster || (members.length === 0 && roster.needsSetup);
   const countryList = useMemo(
     () =>
@@ -808,8 +809,11 @@ function App() {
                               return (
                                 <tr key={m.uid} className="member-row" data-member-id={m.uid}>
                                   <th scope="row" className="member-name">
-                                    <button type="button" className="member-rank-button" disabled={saving} onClick={() => { setRankError(""); setRankEditor({ uid: m.uid, name: m.userName, rank: m.pvpLeaguePhase || "" }); }} aria-label={`${m.userName}のPvPランク帯を設定`}>{m.userName}</button><small className="sort-level">{levelLabel(m.level)}</small>
-                                    <span className="member-pvp" title={m.pvpLeaguePhase ? undefined : m.pvpReference ? "元サイトのメンバー情報から補完" : undefined}>PvP {m.pvpLeaguePhase || m.pvpReference ? pvpRankText(m.pvpLeaguePhase || m.pvpReference) : pvpLoading ? "取得中…" : "未取得"}</span>
+                                    <span className="member-identity">
+                                      <button type="button" className="member-rank-button" disabled={saving} title={m.userName} onClick={() => { setRankError(""); setRankEditor({ uid: m.uid, name: m.userName, rank: m.pvpLeaguePhase || "" }); }} aria-label={`${m.userName}のPvPランク帯を設定`}><span className="member-name-text">{m.userName}</span></button>
+                                      <small className="sort-level">{levelLabel(m.level)}</small>
+                                      <span className="member-pvp" aria-label={`PvPランク ${m.pvpLeaguePhase || m.pvpReference ? pvpRankText(m.pvpLeaguePhase || m.pvpReference) : pvpLoading ? "取得中" : "未取得"}`} title={m.pvpLeaguePhase || m.pvpReference ? pvpRankText(m.pvpLeaguePhase || m.pvpReference) : "PvPランク未取得"}>{m.pvpLeaguePhase || m.pvpReference ? leagueLabel(m.pvpLeaguePhase || m.pvpReference) : pvpLoading ? "…" : "—"}</span>
+                                    </span>
                                   </th>
                                   {dates.flatMap((d) => [1, 2].map((slot) => (
                                     <td key={`${d}-${slot}`} className={d === currentDay ? "selected-day check-cell" : "check-cell"}>
