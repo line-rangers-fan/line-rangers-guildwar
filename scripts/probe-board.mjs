@@ -11,3 +11,14 @@ const c=await request('/api/boards?week='+week);console.log('false read status',
 const d=await request('/api/boards/check','PUT',{uid,day,slot:1,checked:true});console.log('true write status',d.status);
 const e=await request('/api/boards','POST',body);console.log('duplicate create status',e.status);
 const f=await request('/api/boards?week='+week);console.log('after duplicate status',f.status,'value',JSON.stringify(f.payload.states?.[uid]?.[day]));
+
+const started=Date.now();
+try {
+ const catResponse=await fetch('https://line-rangers-fan.github.io/line-rangers-guildwar/data/rosters.json',{signal:AbortSignal.timeout(30000)});
+ const catalog=await catResponse.json();
+ const ids=Object.entries(catalog.guilds||{}).filter(([gid,v])=>v.rank<=200).slice(0,4).map(([gid])=>gid);
+ console.log('catalog status',catResponse.status,'guild count',Object.keys(catalog.guilds||{}).length,'probing',ids.length);
+ const times=await Promise.all(ids.map(async (id)=>{
+   const t=Date.now();try {const r=await fetch('https://rangers-api-3mfw.onrender.com/api/guild-member-info/'+id+'/members',{signal:AbortSignal.timeout(15000)});const j=await r.json();return {status:r.status,seconds:Math.round((Date.now()-t)/1000),count:(Array.isArray(j)?j:j.members||[]).length};}catch(e){return {error:e.name,seconds:Math.round((Date.now()-t)/1000)}}}));
+ console.log('pvp sample',JSON.stringify(times),'elapsed',Math.round((Date.now()-started)/1000));
+} catch(e) { console.log('catalog sample error',e.name,e.message); }
