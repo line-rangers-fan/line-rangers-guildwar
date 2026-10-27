@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { snapshotGuildIds, updateSnapshots, validatePvpSnapshot } from '../shared/pvp-weekly.mjs';
+import { snapshotGuildIds, updateSnapshots, refreshWeeklySnapshots, validatePvpSnapshot } from '../shared/pvp-weekly.mjs';
 import { cachedPvp, loadPvpSnapshot, pvpSnapshotIsStale } from '../src/pvp-snapshot.mjs';
 
 const fixture = { version:1, gid:'one', fetchedAt:'2026-10-24T00:10:00Z', members:[{userName:'A', pvpLeaguePhase:'MASTER_1'}] };
@@ -34,4 +34,30 @@ test('staleness respects Saturday in Japan and allows time for update', () => {
   assert.equal(pvpSnapshotIsStale('2026-10-24T00:10:00Z',new Date('2026-10-30T22:00:00Z')),false);
   assert.equal(pvpSnapshotIsStale('2026-10-24T00:10:00Z',new Date('2026-10-31T00:00:00Z')),true);
   assert.equal(pvpSnapshotIsStale('2026-10-30T20:05:00Z',new Date('2026-10-31T00:00:00Z')),false);
+});
+
+test('weekly retry fetches only failures and keeps old data if retry fails', async () => {
+  const calls = [];
+  const saved = new Map([['three', {...fixture, gid:'three'}]]);
+  const summary = await refreshWeeklySnapshots({ ids:['one','two','three'], concurrency:1,
+    fetchMembers:async (gid, attempt) => {
+      calls.push([gid, attempt]);
+      if (gid === 'three' || gid === 'two' && attempt === 1) throw new Error('temporary outage');
+      return [{userName:'A',pvpLeaguePhase:'GOLD_1'}];
+    },
+    save:async (gid, snapshot) => saved.set(gid,snapshot),
+  });
+  assert.deepEqual(summary,{successes:2,failures:1,skipped:0});
+  assert.deepEqual(calls,[['one',1],['two',1],['three',1],['two',2],['three',2]]);
+  assert.equal(saved.get('three').fetchedAt,fixture.fetchedAt);
+});
+
+test('weekly retry resumes skipped guilds when the source recovers', async () => {
+  const calls=[];
+  const summary=await refreshWeeklySnapshots({ids:['one','two','three'],concurrency:1,maxFailures:1,
+    fetchMembers:async (gid,attempt) => { calls.push([gid,attempt]); if(attempt===1) throw Error('offline'); return [{userName:'A',pvpLeaguePhase:'GOLD_1'}]; },
+    save:async()=>{},
+  });
+  assert.deepEqual(summary,{successes:3,failures:0,skipped:0});
+  assert.deepEqual(calls,[['one',1],['one',2],['two',2],['three',2]]);
 });

@@ -141,9 +141,18 @@ input.attack-check:disabled { cursor:wait; }
 .checklist-heading { flex-wrap:wrap; }
 .checklist-heading .win-summary { color:#235d45; font-weight:700; font-size:12px; white-space:normal; }
 .win-summary small { display:block; font-size:10px; color:#8b6634; font-weight:400; }
-select.attack-result { appearance:none; -webkit-appearance:none; width:28px; height:28px; min-height:0; padding:0; margin:0; text-align:center; text-align-last:center; border:1.5px solid #819080; border-radius:4px; background:#fff; color:#526255; font-size:17px; font-weight:700; cursor:pointer; }
-select.attack-result.result-win { color:#267b54; border-color:#58a273; background:#eaf7ed; }
-select.attack-result.result-loss { color:#b04444; border-color:#ce7c7c; background:#fff0ee; }
-select.attack-result.result-unknown { color:#776a56; background:#f6f0e7; font-size:12px; }
-select.attack-result:disabled { opacity:.6; cursor:wait; }
-@media (max-width:480px) { select.attack-result { width:25px; height:25px; font-size:15px; } .checklist-heading .win-summary { font-size:11px; } }
+button.attack-result { width:28px; height:28px; min-height:0; padding:0; margin:0; text-align:center; border:1.5px solid #819080; border-radius:4px; background:#fff; color:#526255; font-size:17px; font-weight:700; cursor:pointer; }
+button.attack-result.result-win { color:#267b54; border-color:#58a273; background:#eaf7ed; }
+button.attack-result.result-loss { color:#b04444; border-color:#ce7c7c; background:#fff0ee; }
+button.attack-result.result-unknown { border-color:#c19b65; background:#f6f0e7; }
+button.attack-result:disabled { opacity:.6; cursor:wait; }
+.attack-dialog p { margin:0 0 14px; color:#617363; }
+.attack-dialog-choices { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.attack-choice { min-height:76px; display:flex; align-items:center; justify-content:center; gap:8px; border:1.5px solid #d8e1d5; border-radius:10px; background:#fff; color:#304432; cursor:pointer; }
+.attack-choice strong { font-size:30px; line-height:1; }
+.attack-choice.choice-win strong { color:#267b54; }
+.attack-choice.choice-loss strong { color:#b04444; }
+.attack-choice[aria-pressed="true"] { border-color:#58a273; background:#f0f8ef; }
+.attack-dialog .attack-dialog-hint { margin:14px 0 6px; font-size:12px; }
+@media (max-width:480px) { button.attack-result { width:25px; height:25px; font-size:15px; } .checklist-heading .win-summary { font-size:11px; } }
+

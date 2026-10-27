@@ -160,7 +160,8 @@ export function createWorkerHandler(makeStore = createD1Store) {
           return json({ states: await store.getChecks(gid, "ally", checked.dates[0], checked.dates[2]) });
         }
         if ((action === "members" && request.method === "GET") || (action === "sync" && request.method === "POST")) {
-          const r = action === "sync" ? await sources.syncMembers(gid) : await sources.members(gid);
+          const sourceOptions = { includePvp:url.searchParams.get("include_pvp") !== "0" };
+          const r = action === "sync" ? await sources.syncMembers(gid, sourceOptions) : await sources.members(gid, sourceOptions);
           return json({
             members: r.data,
             source: r.source,
@@ -287,3 +288,4 @@ export function createWorkerHandler(makeStore = createD1Store) {
   } };
 }
 export default createWorkerHandler();
+

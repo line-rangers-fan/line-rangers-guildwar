@@ -59,3 +59,28 @@ test("PvP endpoint returns the previous ranks when a refresh fails", async () =>
     store.close();
   }
 });
+
+test("roster-only requests do not contact the PvP source and keep existing API behavior", async () => {
+  const store = openStore(":memory:");
+  let pvpCalls = 0;
+  const sources = createSources(store, {}, async () => {
+    pvpCalls++;
+    return { members:[{userName:"A",pvpLeaguePhase:"GOLD_1"}] };
+  });
+  store.putRoster("guild1", [{uid:"stable",userName:"A",level:100,pvpLeaguePhase:""}], "manual");
+  const server = createApp({store,sources}).listen(0,"127.0.0.1");
+  await new Promise(resolve => server.once("listening",resolve));
+  const base = `http://127.0.0.1:${server.address().port}/api/guilds/guild1/members`;
+  try {
+    const roster = await (await fetch(`${base}?include_pvp=0`)).json();
+    assert.equal(roster.members[0].uid,"stable");
+    assert.equal(pvpCalls,0);
+    const compatible = await (await fetch(base)).json();
+    assert.equal(pvpCalls,1);
+    assert.equal(compatible.members[0].pvpReference,"GOLD_1");
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    store.close();
+  }
+});
+

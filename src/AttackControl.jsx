@@ -1,21 +1,19 @@
 import React from "react";
 
-export function AttackControl({ name, day, slot, attacked, result, disabled, onChange }) {
+export function AttackControl({ name, day, slot, attacked, result, disabled, onOpen }) {
   const value = !attacked ? "empty" : result || "unknown";
+  const label = value === "win" ? "勝ち" : value === "loss" ? "負け" : value === "unknown" ? "勝敗未判定" : "未攻撃";
   return (
-    <label className="attack-control">
-      <select
-        className={`attack-result result-${value}`}
-        value={value}
-        disabled={disabled}
-        aria-label={`${name} ${day} ${slot}回目の勝敗`}
-        onChange={(e) => onChange(e.target.value === "empty" ? null : e.target.value)}
-      >
-        <option value="empty">—</option>
-        <option value="win">○</option>
-        <option value="loss">×</option>
-        <option value="unknown" disabled>済</option>
-      </select>
-    </label>
+    <button
+      type="button"
+      className={`attack-result result-${value}`}
+      disabled={disabled}
+      aria-haspopup="dialog"
+      aria-label={`${name} ${day} ${slot}回目 ${label}。勝敗を選択`}
+      onClick={onOpen}
+    >
+      {value === "win" ? "○" : value === "loss" ? "×" : ""}
+    </button>
   );
 }
+

@@ -9,7 +9,7 @@ export function catalogRoster(catalog, gid) {
 
 export async function loadRosterWithFallback({ api, gid, signal, token = '', catalogURL, fetchCatalog = fetch }) {
   let current;
-  try { current = await api(`/api/guilds/${gid}/members`, { signal }); }
+  try { current = await api(`/api/guilds/${gid}/members?include_pvp=0`, { signal }); }
   catch(e) {
     if (e.name === 'AbortError') throw e;
     current = {members:[],needsSetup:true,stale:true,warning:e.message};
@@ -23,7 +23,7 @@ export async function loadRosterWithFallback({ api, gid, signal, token = '', cat
     if (!candidate || signal?.aborted) return current;
     if (!candidate.members.length) return { ...current, needsSetup:true, stale:true, warning:"配信元の公開名簿にメンバーがまだ収録されていません。", publicObservedAt:candidate.observedAt };
     // A participant may have registered a roster while the catalog downloaded.
-    const latest = await api(`/api/guilds/${gid}/members`, { signal });
+    const latest = await api(`/api/guilds/${gid}/members?include_pvp=0`, { signal });
     if (latest.members?.length || latest.mode === 'manual' || signal?.aborted) return latest;
     current = latest;
     let saved;
@@ -43,3 +43,4 @@ export async function loadRosterWithFallback({ api, gid, signal, token = '', cat
     return current;
   }
 }
+
