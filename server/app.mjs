@@ -1,3 +1,4 @@
+import { appendRoster } from "../shared/roster-additions.mjs";
 import express from "express";
 import { directoryGuilds } from "../shared/personal.mjs";
 import { validateShare } from "../shared/boards.mjs";
@@ -137,6 +138,15 @@ export function createApp({
       });
     },
   );
+  app.get("/api/guilds/:gid/roster-catalog", params, async (req,res) => {
+    try { const r=await fetch(`https://line-rangers-fan.github.io/line-rangers-guildwar/data/rosters/${encodeURIComponent(req.params.gid)}.json`,{signal:AbortSignal.timeout(15000)}); if(!r.ok) throw Error(); const t=await r.text(); if(t.length>100000) throw Error(); res.json(JSON.parse(t)); } catch { res.status(503).json({error:"公開名簿を取得できません。"}); }
+  });
+  app.post("/api/guilds/:gid/roster-additions", params, authorizeWrite, (req,res) => {
+    const previous=store.getRoster(req.params.gid); if(!previous || previous.updatedAt!==req.body?.updatedAt) return res.status(409).json({error:"名簿が変更されました。更新してからやり直してください。"});
+    let data; try {data=appendRoster(previous.data,req.body.members)} catch(e) {return res.status(400).json({error:e.message});}
+    const saved=store.compareAndAppendRoster(req.params.gid,previous,data); if(!saved) return res.status(409).json({error:"名簿が変更されました。更新してからやり直してください。"});
+    res.json({members:saved.data,mode:saved.mode,source:saved.source,fetchedAt:saved.fetchedAt,updatedAt:saved.updatedAt,stale:false});
+  });
   app.get("/api/guild-tiers", async (req, res) => {
     const r = await sources.guildTiers();
     res.json({ tiers: r.data, fetchedAt: r.observedAt || r.fetchedAt, stale: r.stale, warning: r.warning });

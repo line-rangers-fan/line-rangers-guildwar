@@ -41,6 +41,11 @@ export function openStore(path) {
       ).run(gid, JSON.stringify(data), mode, observedAt, now);
       return this.getRoster(gid);
     },
+    compareAndAppendRoster(gid, previous, data) {
+      const now = new Date().toISOString();
+      const r = db.prepare("UPDATE rosters SET payload=?, mode='manual', observed_at=NULL, updated_at=? WHERE gid=? AND updated_at=? AND payload=? AND mode=?").run(JSON.stringify(data), now, gid, previous.updatedAt, JSON.stringify(previous.data), previous.mode);
+      return r.changes === 1 ? this.getRoster(gid) : null;
+    },
     migrateCachedRosters() {
       const guilds = this.getCache("guilds")?.data || [];
       for (const row of db

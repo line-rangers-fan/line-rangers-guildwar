@@ -1,3 +1,4 @@
+import { RosterComparison } from "./RosterComparison.jsx";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -790,6 +791,7 @@ function App() {
                   {pvpWarning && <div className="alert warning" role="status">{pvpWarning}</div>}
                   {pvpReference.gid === gid && pvpReference.fetchedAt && <p className="personal-note">PvPランク取得 {dateText(pvpReference.fetchedAt)} · 毎週土曜更新 · 照合 {members.filter((m) => displayedPvpRank(m)).length}/{members.length}人</p>}
                   {roster?.publicObservedAt && <p className="personal-note">公開名簿の更新日時：{dateText(roster.publicObservedAt)} JST{roster.publicIncomplete ? ` ／ 配信済み${members.length}人・公称${roster.reportedMemberCount}人` : ""}</p>}
+                  {roster && <RosterComparison key={gid} gid={gid} roster={roster} token={token} refresh={refresh} onSaved={(r) => { setRoster(r); announce("新加入者を名簿に追加しました"); }} />}
                   {!rosterLoading && roster && members.length === 0 && <button className="button" onClick={() => setEditingRoster(true)}>メンバーを登録</button>}
                   {editingRoster && (
                     <RosterEditor

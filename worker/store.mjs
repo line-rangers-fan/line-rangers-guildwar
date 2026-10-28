@@ -39,6 +39,12 @@ export function createD1Store(db) {
         .run();
       return this.getRoster(gid);
     },
+    async compareAndAppendRoster(gid, previous, data) {
+      const now = new Date().toISOString();
+      const result = await db.prepare("UPDATE rosters SET payload=?, mode='manual', observed_at=NULL, updated_at=? WHERE gid=? AND updated_at=? AND payload=? AND mode=?")
+        .bind(JSON.stringify(data), now, gid, previous.updatedAt, JSON.stringify(previous.data), previous.mode).run();
+      return result.meta.changes === 1 ? this.getRoster(gid) : null;
+    },
     async getCache(key) {
       const r = await db
         .prepare("SELECT * FROM cache WHERE key=?")

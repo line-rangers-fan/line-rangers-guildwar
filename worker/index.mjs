@@ -1,3 +1,4 @@
+import { appendRoster } from "../shared/roster-additions.mjs";
 import { createD1Store } from "./store.mjs";
 import { directoryGuilds } from "../shared/personal.mjs";
 import { validateShare } from "../shared/boards.mjs";
@@ -137,12 +138,31 @@ export function createWorkerHandler(makeStore = createD1Store) {
           return json({ guild: g }, 201);
         }
         const match = path.match(
-          /^\/api\/guilds\/([^/]+)\/(members|pvp|roster|checks|sync|share)$/,
+          /^\/api\/guilds\/([^/]+)\/(members|pvp|roster|checks|sync|share|roster-catalog|roster-additions)$/,
         );
         if (!match) return json({ error: "APIが見つかりません" }, 404);
         const [, gid, action] = match;
         if (!validId(gid))
           return json({ error: "ギルドIDが正しくありません" }, 400);
+        if (action === "roster-catalog" && request.method === "GET") {
+          try {
+            const response = await fetch(`https://line-rangers-fan.github.io/line-rangers-guildwar/data/rosters/${encodeURIComponent(gid)}.json`, { signal: AbortSignal.timeout(15000), headers: {accept:"application/json"} });
+            if (!response.ok) throw new Error();
+            const text = await response.text();
+            if (text.length > 100000) throw new Error();
+            return json(JSON.parse(text));
+          } catch { return json({error:"公開名簿を取得できません。時間をおいて再試行してください。"}, 503); }
+        }
+        if (action === "roster-additions" && request.method === "POST") {
+          const input = await body();
+          const previous = await store.getRoster(gid);
+          if (!previous || input.updatedAt !== previous.updatedAt) return json({error:"名簿が変更されました。更新してからやり直してください。"}, 409);
+          let data;
+          try { data = appendRoster(previous.data, input.members); } catch(e) { return json({error:e.message}, 400); }
+          const saved = await store.compareAndAppendRoster(gid, previous, data);
+          if (!saved) return json({error:"名簿が変更されました。更新してからやり直してください。"}, 409);
+          return json({members:saved.data, mode:saved.mode, source:saved.source, fetchedAt:saved.fetchedAt, updatedAt:saved.updatedAt, stale:false});
+        }
         if (action === "pvp" && request.method === "GET") {
           try {
             const r = await sources.pvpMembers(gid, url.searchParams.get("refresh") === "1");
