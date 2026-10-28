@@ -352,29 +352,30 @@ function App() {
     let storage;
     try { storage = localStorage; } catch { storage = { getItem: () => null, setItem: () => {} }; }
     const cached = cachedPvp(storage, gid);
-    setPvpReference(cached || { gid, members: [] });
+    setPvpReference(prev => prev.gid === gid && prev.fetchedAt === cached?.fetchedAt && !prev.noWeekly ? prev : (cached || { gid, members: [] }));
     setPvpLoading(!cached);
     loadPvpSnapshot({ gid, storage, signal: controller.signal, url: new URL(`data/pvp/${encodeURIComponent(gid)}.json`, publicBoardURL()) })
       .then(({ snapshot, offline }) => {
         if (controller.signal.aborted) return;
         if (!snapshot) {
-          setPvpWarning("保存済みのPvPランクはまだありません。毎週土曜日に一括更新します。");
+          setPvpReference(prev => prev.gid === gid && prev.noWeekly ? prev : {gid, members:[], fetchedAt:null, noWeekly:true});
+          setPvpWarning("週次PvPデータがないため、参照元から取得します。毎週土曜日に一括更新します。");
         } else {
-          setPvpReference(snapshot);
+          setPvpReference(prev => prev.gid === gid && !prev.noWeekly && prev.fetchedAt === snapshot.fetchedAt ? prev : snapshot);
           if (offline || pvpSnapshotIsStale(snapshot.fetchedAt)) setPvpWarning("PvPランクは前回取得した保存データです。最新の土曜日の更新を確認できませんでした。");
         }
       })
       .catch((error) => { if (error.name !== "AbortError" && !controller.signal.aborted) setPvpWarning("PvPランクの保存データを読み込めませんでした。"); })
       .finally(() => { if (!controller.signal.aborted) setPvpLoading(false); });
     return () => controller.abort();
-  }, [gid, view]);
+  }, [gid, view, refresh]);
   useEffect(() => {
-    if (view !== "checker" || !gid || !roster || pvpReference.gid !== gid || !pvpReference.fetchedAt) return;
+    if (view !== "checker" || !gid || !roster || pvpReference.gid !== gid || (!pvpReference.fetchedAt && !pvpReference.noWeekly)) return;
     const controller = new AbortController();
     let storage;
     try { storage = localStorage; } catch { storage = { getItem: () => null, setItem: () => {} }; }
     setPvpAdditionsWarning("");
-    const weeklyAt = pvpReference.fetchedAt;
+    const weeklyAt = pvpReference.fetchedAt || "no-weekly-snapshot";
     const cached = readPvpAdditions(storage, gid, weeklyAt);
     setPvpAdditions({gid, weeklyAt, members:cached});
     const missing = missingPvpNames(roster.members, pvpReference.members, cached);
@@ -382,18 +383,20 @@ function App() {
     const attemptKey = `${gid}:${weeklyAt}:${missing.slice().sort().join('\u0000')}`;
     if (Date.now() - (pvpAttempt.current[attemptKey] || 0) < 5 * 60000) return () => controller.abort();
     pvpAttempt.current[attemptKey] = Date.now();
+    let settled = false;
     api(`/api/guilds/${encodeURIComponent(gid)}/pvp`, {signal:controller.signal})
       .then(result => {
         if (controller.signal.aborted) return;
-        if (result.stale || !result.fetchedAt || Date.parse(result.fetchedAt) < Date.parse(weeklyAt)) throw new Error("PvP参照データを更新できませんでした。");
+        if (result.stale || !Number.isFinite(Date.parse(result.fetchedAt)) || (pvpReference.fetchedAt && Date.parse(result.fetchedAt) < Date.parse(weeklyAt))) throw new Error("PvP参照データを更新できませんでした。");
         const found = selectPvpAdditions(roster.members, pvpReference.members, cached, result.members);
         const combined = [...cached, ...found];
         savePvpAdditions(storage, gid, weeklyAt, result.fetchedAt, combined);
         setPvpAdditions({gid, weeklyAt, members:combined});
         if (found.length < missing.length) setPvpAdditionsWarning("一部の新メンバーのPvPランクを照合できません。次回再確認します。");
       })
-      .catch(e => { if(e.name !== "AbortError") setPvpAdditionsWarning("新メンバーのPvPランクを取得できません。次回再確認します。"); });
-    return () => controller.abort();
+      .catch(e => { if(e.name !== "AbortError") setPvpAdditionsWarning("新メンバーのPvPランクを取得できません。次回再確認します。"); })
+      .finally(() => { settled = true; });
+    return () => { controller.abort(); if (!settled) delete pvpAttempt.current[attemptKey]; };
   }, [gid, view, roster, pvpReference, refresh]);
   useEffect(() => {
     setPage(1);
@@ -489,7 +492,7 @@ function App() {
   const guilds = useMemo(() => (guildResponse?.guilds || []).map((g) => ({ ...g, guildWarTier: tiersByGuild.get(g.gid)?.tier })), [guildResponse, tiersByGuild]);
   const personalGuilds = useMemo(() => registeredGuilds.filter((saved) => guilds.some((g) => g.gid === saved.gid) || directoryUnavailable && saved.lastGuildWarRank > 0 && saved.lastGuildWarRank <= 200).map((saved) => guilds.find((g) => g.gid === saved.gid) || saved), [guilds, registeredGuilds, directoryUnavailable]);
   const guild = guilds.find((g) => g.gid === gid) || personalGuilds.find((g) => g.gid === gid);
-  const members = useMemo(() => withReferencePvp(roster?.members || [], pvpReference.gid === gid ? [...pvpReference.members, ...(pvpAdditions.gid === gid && pvpAdditions.weeklyAt === pvpReference.fetchedAt ? pvpAdditions.members : [])] : []), [roster, pvpReference, pvpAdditions, gid]);
+  const members = useMemo(() => withReferencePvp(roster?.members || [], pvpReference.gid === gid ? [...pvpReference.members, ...(pvpAdditions.gid === gid && pvpAdditions.weeklyAt === (pvpReference.fetchedAt || "no-weekly-snapshot") ? pvpAdditions.members : [])] : []), [roster, pvpReference, pvpAdditions, gid]);
   const rosterUnavailable = !roster || (members.length === 0 && roster.needsSetup);
   const countryList = useMemo(
     () =>
@@ -821,7 +824,8 @@ function App() {
                   {resultsWarning && <div className="alert warning" role="status">{resultsWarning}</div>}
                   {pvpWarning && <div className="alert warning" role="status">{pvpWarning}</div>}
                   {pvpAdditionsWarning && <div className="alert warning" role="status">{pvpAdditionsWarning}</div>}
-                  {pvpReference.gid === gid && pvpReference.fetchedAt && <p className="personal-note">週次PvP取得 {dateText(pvpReference.fetchedAt)} · 毎週土曜更新 · 照合 {members.filter((m) => displayedPvpRank(m)).length}/{members.length}人{pvpAdditions.gid === gid && pvpAdditions.weeklyAt === pvpReference.fetchedAt && pvpAdditions.members.length > 0 ? `（新メンバー ${pvpAdditions.members.length}人を別途取得）` : ""}</p>}
+                  {pvpReference.gid === gid && pvpReference.noWeekly && pvpAdditions.gid === gid && pvpAdditions.members.length > 0 && <p className="personal-note">参照元からPvPランクを取得 · 照合 {members.filter((m) => displayedPvpRank(m)).length}/{members.length}人</p>}
+                  {pvpReference.gid === gid && pvpReference.fetchedAt && <p className="personal-note">週次PvP取得 {dateText(pvpReference.fetchedAt)} · 毎週土曜更新 · 照合 {members.filter((m) => displayedPvpRank(m)).length}/{members.length}人{pvpAdditions.gid === gid && pvpAdditions.weeklyAt === (pvpReference.fetchedAt || "no-weekly-snapshot") && pvpAdditions.members.length > 0 ? `（新メンバー ${pvpAdditions.members.length}人を別途取得）` : ""}</p>}
                   {roster?.publicObservedAt && <p className="personal-note">公開名簿の更新日時：{dateText(roster.publicObservedAt)} JST{roster.publicIncomplete ? ` ／ 配信済み${members.length}人・公称${roster.reportedMemberCount}人` : ""}</p>}
                   {roster && <RosterComparison key={gid} gid={gid} roster={roster} token={token} refresh={refresh} onSaved={(r) => { setRoster(r); announce("新加入者を名簿に追加しました"); }} />}
                   {!rosterLoading && roster && members.length === 0 && <button className="button" onClick={() => setEditingRoster(true)}>メンバーを登録</button>}

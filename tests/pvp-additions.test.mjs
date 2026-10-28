@@ -23,3 +23,21 @@ test('supplemental cache is scoped to guild and weekly snapshot',()=>{
  assert.deepEqual(readPvpAdditions(storage,'one','2026-10-31T00:00:00Z'),[]);
  assert.deepEqual(readPvpAdditions(storage,'two','2026-10-27T12:49:48Z'),[]);
 });
+
+test('200 guilds keep additions isolated, including guilds without a weekly snapshot',()=>{
+ const map=new Map(), storage={getItem:k=>map.get(k),setItem:(k,v)=>map.set(k,v)};
+ for(let i=0;i<200;i++) {
+  const gid=`guild-${i}`; const weeklyAt=i%2 ? 'no-weekly-snapshot' : '2026-10-27T12:49:48Z';
+  const roster=[{userName:`既存${i}`},{userName:`移籍${i}`}];
+  const weekly=i%2 ? [] : [{userName:`既存${i}`,pvpLeaguePhase:'GOLD_1'}];
+  const live=[{userName:`既存${i}`,pvpLeaguePhase:'MASTER_1'},{userName:`移籍${i}`,pvpLeaguePhase:'DIAMOND_1'}];
+  const selected=selectPvpAdditions(roster,weekly,[],live);
+  assert.equal(selected.length,i%2 ? 2:1);
+  savePvpAdditions(storage,gid,weeklyAt,'2026-10-28T09:00:00Z',selected);
+ }
+ for(let i=0;i<200;i++) {
+  const rows=readPvpAdditions(storage,`guild-${i}`,i%2 ? 'no-weekly-snapshot':'2026-10-27T12:49:48Z');
+  assert.ok(rows.some(m=>m.userName===`移籍${i}`));
+  assert.ok(rows.every(m=>m.userName.endsWith(String(i))));
+ }
+});
