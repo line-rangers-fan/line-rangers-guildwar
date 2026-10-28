@@ -5,7 +5,8 @@ import { openStore } from '../server/store.mjs';
 const old=[{uid:'old-id',userName:'既存',level:100,pvpLeaguePhase:'GOLD'}];
 test('only unique unmatched names are candidates; ambiguous names are reported',()=>{
  const result=rosterCandidates(old,[{userName:'既存',level:100},{userName:'新規',level:10},{userName:'同名',level:2},{userName:'同名',level:3}]);
- assert.deepEqual(result.additions.map(x=>x.userName),['新規']); assert.deepEqual(result.ambiguous,['同名']);
+ assert.deepEqual(result.additions.map(x=>x.userName),['新規']); assert.deepEqual(result.ambiguous,['同名']); assert.deepEqual(result.missing,[]);
+ assert.deepEqual(rosterCandidates(old,[{userName:'新規',level:10}]).missing,old);
 });
 test('append retains all existing records and refuses duplicates and excess',()=>{
  const next=appendRoster(old,[{userName:'新規',level:10}],()=> 'new-id');

@@ -92,3 +92,25 @@ test("manual edits made during a public fetch are kept", async () => {
     assert.equal(store.getRoster("guild1").mode, "manual");
   } finally { store.close(); }
 });
+
+
+test("changed or incomplete public roster cannot remove saved members or checks", async () => {
+  for (const kind of ["missing", "incomplete"]) {
+    const store = openStore(":memory:");
+    try {
+      store.putRoster("guild1", [{uid:"stable",userName:"名前",level:499,pvpLeaguePhase:""}], "rangerbook", new Date().toISOString());
+      store.saveCheck({gid:"guild1",team:"ally",uid:"stable",day:"2026-10-23",slot:1,checked:true});
+      const sources = createSources(store, {}, async (url) => {
+        if (url === RANKING_URL) return ranking();
+        const data = snapshot();
+        if (kind === "missing") data.guilds[0].members[0].name = "改名候補";
+        else data.guilds[0].curMemberCount = 2;
+        return data;
+      });
+      const result = await sources.members("guild1");
+      assert.equal(result.stale,true); assert.equal(result.data[0].uid,"stable");
+      assert.equal(store.getRoster("guild1").data[0].userName,"名前");
+      assert.equal(store.getChecks("guild1","ally","2026-10-21","2026-10-25").stable["2026-10-23"][1],true);
+    } finally { store.close(); }
+  }
+});

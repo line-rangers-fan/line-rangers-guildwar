@@ -3,7 +3,8 @@ export function rosterCandidates(current, publicMembers) {
   const counts = new Map();
   for (const m of publicMembers) counts.set(m.userName, (counts.get(m.userName) || 0) + 1);
   const existing = new Set(current.map(m => m.userName));
-  return { additions: publicMembers.filter(m => !existing.has(m.userName) && counts.get(m.userName) === 1), ambiguous: publicMembers.filter(m => counts.get(m.userName) > 1).map(m => m.userName).filter((v,i,a) => a.indexOf(v) === i) };
+  const missing = current.filter(m => !counts.has(m.userName));
+  return { missing, additions: publicMembers.filter(m => !existing.has(m.userName) && counts.get(m.userName) === 1), ambiguous: publicMembers.filter(m => counts.get(m.userName) > 1).map(m => m.userName).filter((v,i,a) => a.indexOf(v) === i) };
 }
 export function appendRoster(current, additions, newId = () => `rb-${crypto.randomUUID()}`) {
   if (!Array.isArray(additions) || !additions.length || current.length + additions.length > 50) throw new Error("追加人数を確認してください（最大50人）。");

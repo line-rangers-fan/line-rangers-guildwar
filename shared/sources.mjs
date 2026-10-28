@@ -103,8 +103,11 @@ export function createSources(store, config = {}, requestJSON) {
           return value;
         }, { compactGuilds: true });
         if (snapshot.stale) throw new Error("Rangerbookの公開名簿を更新できません。");
-        const { members, observedAt } = selectRoster(ranking.data, snapshot.data, gid);
-        if (!members.length) throw new Error("配信元の公開名簿にメンバーがまだ収録されていません。");
+        const { members, observedAt, incomplete } = selectRoster(ranking.data, snapshot.data, gid);
+        if (!members.length || incomplete) throw new Error("公開名簿が空または不完全なため、保存済み名簿を維持します。");
+        const publishedNames = new Set(members.map((member) => member.name));
+        if (previous?.data.some((member) => !publishedNames.has(member.userName)))
+          throw new Error("公開名簿にない保存済みメンバーがいます。脱退・改名を「名簿を管理」で確認してください。既存の名簿は維持しています。");
         const { data, duplicates } = reconcileRoster(previous?.data || [], members);
         // Re-read after the network operation: do not race a manual edit.
         const current = await store.getRoster(gid);
